@@ -22,6 +22,14 @@ public class RestClientConfig {
     }
 
     @Bean
+    @Qualifier("nbuClient")
+    public RestClient nbuClient() {
+        return RestClient.builder()
+                .baseUrl("https://bank.gov.ua") // Your API base URL
+                .build();
+    }
+
+    @Bean
     @Qualifier("rateLimitInterceptor")
     public ClientHttpRequestInterceptor rateLimitInterceptor() {
         return new RateLimitInterceptor(4, Duration.ofMinutes(1));

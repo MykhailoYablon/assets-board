@@ -1,5 +1,6 @@
 package com.assets.board.service;
 
+import com.assets.board.client.NbuDataClient;
 import com.assets.board.model.DividendRecord;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
@@ -20,15 +21,15 @@ import java.util.regex.Pattern;
 @AllArgsConstructor
 public class DividendService {
 
-    private final String NBU_EXCHANGE =
-            "https://bank.gov.ua/NBUStatService/v1/statdirectory/exchangenew?" +
-                    "json&valcode=USD&date=20250331";
-
     private static final Pattern SYMBOL_PATTERN = Pattern.compile("^([A-Z]+)(?=\\()");
+
+    private final NbuDataClient nbuDataClient;
 
 
     public void calculateDividendTax() {
         List<DividendRecord> dividendRecords = parseFile();
+
+        dividendRecords.removeLast();
 
         List<DividendRecord> list = dividendRecords.stream()
                 .map(dividendRecord -> {
@@ -36,11 +37,25 @@ public class DividendService {
                     if (matcher.find()) {
                         dividendRecord.setSymbol(matcher.group(1));
                     }
+                    String date = dividendRecord.getDate().replaceAll("-", "");
+                    String exchangeRate = nbuDataClient.exchangeRate(date, dividendRecord.getCurrency());
+
+                    dividendRecord.setNbu(exchangeRate);
+                    var uaBrutto = Double.parseDouble(exchangeRate) * Double.parseDouble(dividendRecord.getAmount());
+                    dividendRecord.setUaBrutto(uaBrutto);
+
+                    var tax9 = uaBrutto * 0.09;
+                    var militaryTax5 = uaBrutto * 0.05;
+
+                    dividendRecord.setTax9(tax9);
+                    dividendRecord.setMilitaryTax5(militaryTax5);
+                    dividendRecord.setTaxSum(tax9 + militaryTax5);
+
                     return dividendRecord;
                 })
                 .toList();
 
-        list.forEach(e -> log.info(String.valueOf(e)));
+        log.info("Test");
 
     }
 

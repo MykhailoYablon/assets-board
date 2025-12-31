@@ -13,6 +13,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class AssetsApplication {
     public static void main(String[] args) {
 
+//        SpringApplication.run(AssetsApplication.class, args);
+
         // 1. Capture the context returned by run()
         ConfigurableApplicationContext context = SpringApplication.run(AssetsApplication.class, args);
 

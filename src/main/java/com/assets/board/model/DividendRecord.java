@@ -18,6 +18,10 @@ public class DividendRecord {
     @JsonProperty("date")
     String date;
 
+    @CsvBindByName(column = "Currency")
+    @JsonProperty("currency")
+    String currency;
+
     @CsvBindByName(column = "Description")
     @JsonProperty("description")
     String description;
@@ -25,4 +29,19 @@ public class DividendRecord {
     @CsvBindByName(column = "Amount")
     @JsonProperty("amount")
     String amount;
+
+    @JsonProperty("nbu")
+    String nbu;
+
+    @JsonProperty("uaBrutto")
+    Double uaBrutto;
+
+    @JsonProperty("tax9")
+    Double tax9;
+
+    @JsonProperty("militaryTax5")
+    Double militaryTax5;
+
+    @JsonProperty("taxSum")
+    Double taxSum;
 }
