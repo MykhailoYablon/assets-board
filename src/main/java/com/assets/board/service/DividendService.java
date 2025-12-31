@@ -12,6 +12,8 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -22,10 +24,23 @@ public class DividendService {
             "https://bank.gov.ua/NBUStatService/v1/statdirectory/exchangenew?" +
                     "json&valcode=USD&date=20250331";
 
+    private static final Pattern SYMBOL_PATTERN = Pattern.compile("^([A-Z]+)(?=\\()");
+
+
     public void calculateDividendTax() {
         List<DividendRecord> dividendRecords = parseFile();
 
+        List<DividendRecord> list = dividendRecords.stream()
+                .map(dividendRecord -> {
+                    Matcher matcher = SYMBOL_PATTERN.matcher(dividendRecord.getDescription());
+                    if (matcher.find()) {
+                        dividendRecord.setSymbol(matcher.group(1));
+                    }
+                    return dividendRecord;
+                })
+                .toList();
 
+        list.forEach(e -> log.info(String.valueOf(e)));
 
     }
 
