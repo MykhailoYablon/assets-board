@@ -29,10 +29,10 @@ public class NbuDataClient {
     @Qualifier("nbuClient")
     private RestClient nbuClient;
 
-    public String exchangeRate(String date, String currency) {
+    public String exchangeRate(String date) {
         List<NbuExchangeRate> rate = nbuClient.get()
                 .uri(NBU_EXCHANGE.url() + "?json"
-                        + "&valcode=" + currency
+                        + "&valcode=" + "USD"
                         + "&date=" + date
                 )
                 .retrieve()
