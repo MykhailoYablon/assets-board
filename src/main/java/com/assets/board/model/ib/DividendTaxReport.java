@@ -15,8 +15,8 @@ public class DividendTaxReport {
 
     private BigDecimal amount;
 
-    @JsonProperty("nbu")
-    String nbu;
+    @JsonProperty("nbuRate")
+    BigDecimal nbuRate;
 
     @JsonProperty("uaBrutto")
     BigDecimal uaBrutto;
@@ -30,5 +30,22 @@ public class DividendTaxReport {
     @JsonProperty("taxSum")
     BigDecimal taxSum;
 
-//    USTaxUSD,USTaxUAH,TotalTaxUAH,USNetto,UANetto,Dividends$Netto
+    @JsonProperty("usTaxUSD")
+    BigDecimal usTaxUSD;
+
+    @JsonProperty("usTaxUAH")
+    BigDecimal usTaxUAH;
+
+    @JsonProperty("totalTaxUAH")
+    BigDecimal totalTaxUAH;
+
+    @JsonProperty("usNetto")
+    BigDecimal usNetto;
+
+    @JsonProperty("uaNetto")
+    BigDecimal uaNetto;
+
+    @JsonProperty("dividends$Netto")
+    BigDecimal dividends$Netto;
+
 }

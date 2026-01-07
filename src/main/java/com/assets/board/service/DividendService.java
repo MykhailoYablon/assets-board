@@ -1,11 +1,7 @@
 package com.assets.board.service;
 
 import com.assets.board.client.NbuDataClient;
-import com.assets.board.model.ib.DividendRecord;
 import com.assets.board.model.ib.DividendTaxReport;
-import com.assets.board.model.ib.WithholdingTaxRecord;
-import com.opencsv.bean.CsvToBean;
-import com.opencsv.bean.CsvToBeanBuilder;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -14,25 +10,21 @@ import org.springframework.stereotype.Service;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @AllArgsConstructor
 public class DividendService {
 
-    private static final Pattern SYMBOL_PATTERN = Pattern.compile("^([A-Z]+)(?=\\()");
-
-    private final NbuDataClient nbuDataClient;
+    private final ExchangeRateService exchangeRateService;
+    private final CsvService csvService;
     private final IBDividendParser parser;
 
 
-    public void calculateDividendTax() {
+    public void calculateDividendTax(boolean isMilitary) {
         IBDividendParser.ParsedData parsedData = parseIBFile();
 
         var dividends = Optional.ofNullable(parsedData)
@@ -42,21 +34,33 @@ public class DividendService {
                 .map(IBDividendParser.ParsedData::getWithholdingTaxes)
                 .orElse(Collections.emptyList());
 
+        // Collect all unique dates
+        Set<LocalDate> allDates = new HashSet<>();
+        // Get unique dates
+        Set<LocalDate> uniqueDates = dividends.stream()
+                .map(IBDividendParser.DividendData::getDate)
+                .collect(Collectors.toSet());
+
+        // Pre-fetch/cache all rates
+        Map<LocalDate, BigDecimal> rateCache = new HashMap<>();
+        for (LocalDate date : uniqueDates) {
+            rateCache.put(date, exchangeRateService.getRateForDate(date));
+        }
 
         var reports = dividends.stream()
-                .map(dividendRecord -> {
+                .map(dividend -> {
                     DividendTaxReport report = new DividendTaxReport();
 
-                    report.setSymbol(dividendRecord.getSymbol());
-                    report.setDate(dividendRecord.getDate());
-                    report.setAmount(dividendRecord.getAmount());
+                    report.setSymbol(dividend.getSymbol());
+                    report.setDate(dividend.getDate());
+                    BigDecimal amount = dividend.getAmount();
+                    report.setAmount(amount);
 
-                    String date = dividendRecord.getDate().toString().replaceAll("-", "");
-                    String exchangeRate = nbuDataClient.exchangeRate(date);
+                    BigDecimal exchangeRate = rateCache.get(dividend.getDate());
 
-                    report.setNbu(exchangeRate);
+                    report.setNbuRate(exchangeRate);
 
-                    var uaBrutto = new BigDecimal(exchangeRate).multiply(dividendRecord.getAmount());
+                    var uaBrutto = exchangeRate.multiply(amount);
 
                     report.setUaBrutto(uaBrutto);
 
@@ -65,14 +69,38 @@ public class DividendService {
 
                     report.setTax9(tax9);
                     report.setMilitaryTax5(militaryTax5);
-                    report.setTaxSum(tax9.add(militaryTax5));
+
+                    //if you are in military then don't
+                    BigDecimal taxSum;
+                    if (isMilitary) {
+                        taxSum = tax9;
+                        report.setTaxSum(tax9);
+                    } else {
+                        taxSum = tax9.add(militaryTax5);
+                        report.setTaxSum(taxSum);
+                    }
+
+                    //
+                    var usTaxUSD = amount.multiply(BigDecimal.valueOf(0.15));
+                    report.setUsTaxUSD(usTaxUSD);
+
+                    var usTaxUAH = usTaxUSD.multiply(exchangeRate);
+                    report.setUsTaxUAH(usTaxUAH);
+
+                    BigDecimal totalTaxUAH = taxSum.add(usTaxUAH);
+                    report.setTotalTaxUAH(totalTaxUAH);
+
+                    report.setUsNetto(uaBrutto.subtract(usTaxUAH));
+                    report.setUaNetto(uaBrutto.subtract(totalTaxUAH));
+
+                    //or - 5%
+                    report.setDividends$Netto(amount.multiply(BigDecimal.valueOf(0.29)));
 
                     return report;
                 })
                 .toList();
 
-        log.info("Reports - {}", reports);
-
+        csvService.writeCsvReport(reports);
     }
 
     private IBDividendParser.ParsedData parseIBFile() {

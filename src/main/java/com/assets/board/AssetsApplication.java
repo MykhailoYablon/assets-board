@@ -22,6 +22,6 @@ public class AssetsApplication {
         DividendService service = context.getBean(DividendService.class);
 
         // 3. Call the method
-        service.calculateDividendTax();
+        service.calculateDividendTax(false);
     }
 } 

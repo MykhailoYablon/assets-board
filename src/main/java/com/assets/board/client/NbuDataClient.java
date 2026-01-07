@@ -1,6 +1,7 @@
 package com.assets.board.client;
 
 import com.assets.board.model.NbuExchangeRate;
+import com.assets.board.service.ExchangeRateService;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -12,7 +13,10 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static com.assets.board.model.enums.Endpoint.NBU_EXCHANGE;
 
@@ -29,17 +33,21 @@ public class NbuDataClient {
     @Qualifier("nbuClient")
     private RestClient nbuClient;
 
-    public String exchangeRate(String date) {
+    public BigDecimal exchangeRate(LocalDate date) {
+        var requestDate = date.toString().replaceAll("-", "");
         List<NbuExchangeRate> rate = nbuClient.get()
                 .uri(NBU_EXCHANGE.url() + "?json"
                         + "&valcode=" + "USD"
-                        + "&date=" + date
+                        + "&date=" + requestDate
                 )
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {
                 });
-        log.info("Latest exchange rate for date - {} is {}", date, rate);
-        return rate.getFirst().getRate();
+        BigDecimal exchangeRate = Optional.ofNullable(rate)
+                .map(List::getFirst)
+                .map(NbuExchangeRate::getRate)
+                .map(BigDecimal::new)
+                .orElse(BigDecimal.ZERO);
+        return exchangeRate;
     }
-
 }
