@@ -7,6 +7,8 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import java.util.TimeZone;
+
 @EnableScheduling
 @EnableAsync
 @SpringBootApplication
@@ -14,7 +16,7 @@ public class AssetsApplication {
     public static void main(String[] args) {
 
 //        SpringApplication.run(AssetsApplication.class, args);
-
+        TimeZone.setDefault(TimeZone.getTimeZone("Europe/Kyiv"));
         // 1. Capture the context returned by run()
         ConfigurableApplicationContext context = SpringApplication.run(AssetsApplication.class, args);
 
