@@ -1,4 +1,4 @@
-package com.assets.board.model.ib;
+package com.assets.board.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
@@ -7,13 +7,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
-public class DividendTaxReport {
+public class DividendTaxDto {
 
     String symbol;
 
-    private LocalDate date;
+    LocalDate date;
 
-    private BigDecimal amount;
+    BigDecimal amount;
 
     @JsonProperty("nbuRate")
     BigDecimal nbuRate;

@@ -1,6 +1,7 @@
 package com.assets.board.service;
 
-import com.assets.board.model.ib.DividendTaxReport;
+import com.assets.board.dto.DividendTaxDto;
+import com.assets.board.dto.TotalDividendTaxDto;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,13 +19,13 @@ import java.util.List;
 public class CsvService {
 
     private static final String DIVIDEND_REPORT_CSV_HEADER = "Stock Symbol,Дата отримання,Дивіденди в $ Brutto," +
-            "Дивіденди в UAH Brutto, НБУ курс в цей день,Податок 9% UAH,Військовий збір 5%,Сума 9% + 5%," +
+            "Дивіденди в UAH Brutto,НБУ курс в цей день,Податок 9% UAH,Військовий збір 5%,Сума 9% + 5%," +
             "Стягнено в США 15%,Стягнено в США 15% UAH," +
             "Загально податку UAH,Netto US -15%,Netto UAH,Дивіденди Netto $\n";
 
     private static final String NBU_EXCHANGE_RATE = "Дата,Курс $";
 
-    public void writeCsvReport(List<DividendTaxReport> taxReportList) {
+    public void writeCsvReport(List<DividendTaxDto> taxReportList, TotalDividendTaxDto totals) {
         new File("exports/").mkdirs();
         String filePath = "exports/dividendsTaxReport.csv";
 
@@ -34,22 +35,40 @@ public class CsvService {
 
             // Write data rows
             taxReportList
-                    .forEach(data -> writer.printf("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s%n",
+                    .forEach(data -> writer.printf("%s,%s,%s,%s,%s,%s,%s,%s%n",
                             data.getSymbol(),
                             data.getDate(),
-                            data.getAmount(),
-                            data.getUaBrutto(),
-                            data.getNbuRate(),
-                            data.getTax9(),
-                            data.getMilitaryTax5(),
-                            data.getTaxSum(),
-                            data.getUsTaxUSD(),
-                            data.getUsTaxUAH(),
-                            data.getTotalTaxUAH(),
-                            data.getUsNetto(),
-                            data.getUaNetto(),
-                            data.getDividends$Netto()
+                            data.getAmount(), //Дивіденди в $ Brutto
+                            data.getUaBrutto(), //Дивіденди в UAH Brutto
+                            data.getNbuRate(), //НБУ курс в цей день
+                            data.getTax9(), //Податок 9% UAH
+                            data.getMilitaryTax5(), //Військовий збір 5%
+                            data.getTaxSum() //Сума 9% + 5%
+                            //Перерахувати
+//                            data.getUsTaxUSD(), //Стягнено в США 15%
+//                            data.getUsTaxUAH(), //Стягнено в США 15% UAH
+//                            data.getTotalTaxUAH(), //Загально податку UAH
+//                            data.getUsNetto(), //Netto US -15%
+//                            data.getUaNetto(), //Netto UAH
+//                            data.getDividends$Netto() //Дивіденди Netto $
                     ));
+            // Write totals row (empty strings for non-summable columns)
+            writer.printf("%s,%s,%s,%s,%s,%s,%s,%s%n",
+                    "TOTAL",           // Symbol column
+                    "",                // Date column (empty)
+                    totals.getTotalAmount(),
+                    totals.getTotalUaBrutto(),
+                    "",                // NBU Rate column (empty - no average makes sense)
+                    totals.getTotalTax9(),
+                    totals.getTotalMilitaryTax5(),
+                    totals.getTotalTaxSum()
+//                    totals.getTotalUsTaxUSD(),
+//                    totals.getTotalUsTaxUAH(),
+//                    totals.getTotalTaxUAH(),
+//                    totals.getTotalUsNetto(),
+//                    totals.getTotalUaNetto(),
+//                    totals.getTotalDividendsNetto()
+            );
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
