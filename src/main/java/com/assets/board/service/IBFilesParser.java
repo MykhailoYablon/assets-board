@@ -1,26 +1,31 @@
 package com.assets.board.service;
 import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import com.assets.board.model.ib.DividendRecord;
-import com.assets.board.model.ib.IBRecord;
+import com.assets.board.model.ib.IBPosition;
 import com.assets.board.model.ib.WithholdingTaxRecord;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
-public class IBDividendParser {
+public class IBFilesParser {
 
     private static final Pattern SYMBOL_PATTERN = Pattern.compile("^([A-Z]+)(?=\\()");
 
@@ -44,7 +49,24 @@ public class IBDividendParser {
         private List<WithholdingTaxData> withholdingTaxes = new ArrayList<>();
     }
 
-    public ParsedData parseFile(Reader reader) throws Exception {
+    public List<IBPosition> parseIBPositions(MultipartFile ibReportFile) {
+        try {
+            try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
+
+                CsvToBean<IBPosition> csvToBean = new CsvToBeanBuilder<IBPosition>(reader)
+                        .withType(IBPosition.class)
+                        .withIgnoreLeadingWhiteSpace(true)
+                        .build();
+
+                return csvToBean.parse();
+            }
+        } catch (Exception e) {
+            log.info("Error");
+            return Collections.emptyList();
+        }
+    }
+
+    public ParsedData parseDividendFile(Reader reader) throws Exception {
         BufferedReader bufferedReader = new BufferedReader(reader);
 
         List<String> dividendLines = new ArrayList<>();

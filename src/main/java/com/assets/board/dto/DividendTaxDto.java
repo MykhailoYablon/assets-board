@@ -30,22 +30,22 @@ public class DividendTaxDto {
     @JsonProperty("taxSum")
     BigDecimal taxSum;
 
-    @JsonProperty("usTaxUSD")
-    BigDecimal usTaxUSD;
-
-    @JsonProperty("usTaxUAH")
-    BigDecimal usTaxUAH;
-
-    @JsonProperty("totalTaxUAH")
-    BigDecimal totalTaxUAH;
-
-    @JsonProperty("usNetto")
-    BigDecimal usNetto;
-
-    @JsonProperty("uaNetto")
-    BigDecimal uaNetto;
-
-    @JsonProperty("dividends$Netto")
-    BigDecimal dividends$Netto;
+//    @JsonProperty("usTaxUSD")
+//    BigDecimal usTaxUSD;
+//
+//    @JsonProperty("usTaxUAH")
+//    BigDecimal usTaxUAH;
+//
+//    @JsonProperty("totalTaxUAH")
+//    BigDecimal totalTaxUAH;
+//
+//    @JsonProperty("usNetto")
+//    BigDecimal usNetto;
+//
+//    @JsonProperty("uaNetto")
+//    BigDecimal uaNetto;
+//
+//    @JsonProperty("dividends$Netto")
+//    BigDecimal dividends$Netto;
 
 }

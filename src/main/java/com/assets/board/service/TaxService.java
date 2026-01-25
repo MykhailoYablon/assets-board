@@ -1,6 +1,7 @@
 package com.assets.board.service;
 
 import com.assets.board.dto.DividendTaxDto;
+import com.assets.board.dto.TaxReportDto;
 import com.assets.board.dto.TotalDividendTaxDto;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,28 +27,28 @@ public class TaxService {
 
     private final ExchangeRateService exchangeRateService;
     private final CsvService csvService;
-    private final IBDividendParser parser;
+    private final IBFilesParser parser;
 
 
-    public List<DividendTaxDto> calculateDividendTax(MultipartFile ibReportFile, boolean isMilitary) {
-        IBDividendParser.ParsedData parsedData = parseIBFile(ibReportFile);
+    public TaxReportDto calculateDividendTax(MultipartFile ibReportFile, boolean isMilitary) {
+        IBFilesParser.ParsedData parsedData = parseIBFile(ibReportFile);
 
         var dividends = Optional.ofNullable(parsedData)
-                .map(IBDividendParser.ParsedData::getDividends)
+                .map(IBFilesParser.ParsedData::getDividends)
                 .orElse(Collections.emptyList());
 
         //withholding Tax is not calculated for now
         var withholdingTaxes = Optional.ofNullable(parsedData)
-                .map(IBDividendParser.ParsedData::getWithholdingTaxes)
+                .map(IBFilesParser.ParsedData::getWithholdingTaxes)
                 .orElse(Collections.emptyList())
                 .stream()
                 .collect(Collectors
-                        .groupingBy(IBDividendParser.WithholdingTaxData::getSymbol,
+                        .groupingBy(IBFilesParser.WithholdingTaxData::getSymbol,
                                 Collectors.mapping(e -> e, Collectors.toList())));
 
         // Get unique dates
         Set<LocalDate> uniqueDates = dividends.stream()
-                .map(IBDividendParser.DividendData::getDate)
+                .map(IBFilesParser.DividendData::getDate)
                 .collect(Collectors.toSet());
 
         // Pre-fetch/cache all rates
@@ -55,6 +56,26 @@ public class TaxService {
         for (LocalDate date : uniqueDates) {
             rateCache.put(date, exchangeRateService.getRateForDate(date));
         }
+
+        //need to change this
+        //                    var usTaxUSD = amount.multiply(BigDecimal.valueOf(0.15))
+        //                            .setScale(SCALE, ROUNDING_MODE);
+        //                    report.setUsTaxUSD(usTaxUSD);
+        //
+        //                    var usTaxUAH = usTaxUSD.multiply(exchangeRate)
+        //                            .setScale(SCALE, ROUNDING_MODE);
+        //                    report.setUsTaxUAH(usTaxUAH);
+        //
+        //                    BigDecimal totalTaxUAH = taxSum.add(usTaxUAH);
+        //                    report.setTotalTaxUAH(totalTaxUAH);
+        //
+        //                    report.setUsNetto(uaBrutto.subtract(usTaxUAH));
+        //                    report.setUaNetto(uaBrutto.subtract(totalTaxUAH));
+        //
+        //                    //or - 5%
+        //                    report.setDividends$Netto(amount.multiply(BigDecimal.valueOf(0.29)).setScale(SCALE, ROUNDING_MODE));
+
+//        csvService.writeCsvReport(reports, taxReportTotals);
 
         var reports = dividends.stream()
                 .map(dividend -> {
@@ -114,12 +135,19 @@ public class TaxService {
                 })
                 .toList();
 
-//        csvService.writeCsvReport(reports, taxReportTotals);
+        TotalDividendTaxDto totalDividendTaxDto = this.calculateTotals(reports);
 
-        return reports;
+        return TaxReportDto.builder()
+                .totalDividendTaxDto(totalDividendTaxDto)
+                .dividendTaxDtos(reports)
+                .build();
     }
 
-    public TotalDividendTaxDto calculateTotals(List<DividendTaxDto> reports) {
+    public void generateUaTaxDeclarationXml(TaxReportDto taxReportDto) {
+
+    }
+
+    private TotalDividendTaxDto calculateTotals(List<DividendTaxDto> reports) {
         TotalDividendTaxDto totals = new TotalDividendTaxDto();
 
         // Sum amounts first
@@ -147,6 +175,17 @@ public class TaxService {
         return totals;
     }
 
+    private IBFilesParser.ParsedData parseIBFile(MultipartFile ibReportFile) {
+        try {
+            try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
+                return parser.parseDividendFile(reader);
+            }
+        } catch (Exception e) {
+            log.info("Error");
+            return null;
+        }
+    }
+
     private BigDecimal sum(List<DividendTaxDto> reports,
                            Function<DividendTaxDto, BigDecimal> getter) {
         return reports.stream()
@@ -156,17 +195,5 @@ public class TaxService {
 
     private static BigDecimal round(BigDecimal value) {
         return value.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private IBDividendParser.ParsedData parseIBFile(MultipartFile ibReportFile) {
-        String dividendsFile = "U17113716_2025_2025.csv";
-        try {
-            try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
-                return parser.parseFile(reader);
-            }
-        } catch (Exception e) {
-            log.info("Error");
-            return null;
-        }
     }
 }
