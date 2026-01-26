@@ -19,18 +19,20 @@ public class PositionController {
     private final AIService aiService;
 
     @PostMapping
-    public void addPositions(@RequestParam("file") MultipartFile ibPositionsFile) {
-        positionService.addPositions(ibPositionsFile);
+    public List<IBPosition> addPositions(@RequestParam("file") MultipartFile ibPositionsFile) {
+        //Save File as entity for historic comparison?
+        //Show only latest positions?
+        return positionService.addPositions(ibPositionsFile);
     }
 
     @GetMapping("/all")
     public List<IBPosition> getAllPositions() {
-        return positionService.getAllIBPositions();
+        return positionService.getAllIBPositionsStatistics();
     }
 
-    @PostMapping("/ai")
-    public String getAiSummary(@RequestParam("file") MultipartFile ibPositionsFile) {
-        return aiService.analyzePositions(ibPositionsFile);
+    @GetMapping("/ai")
+    public String getAiSummary() {
+        return aiService.analyzePositions();
     }
 
 }

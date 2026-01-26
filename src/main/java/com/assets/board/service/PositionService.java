@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface PositionService {
 
-    List<IBPosition> getAllIBPositions();
+    List<IBPosition> getAllIBPositionsStatistics();
 
-    void addPositions(MultipartFile ibPositionsFile);
+    List<IBPosition> addPositions(MultipartFile ibPositionsFile);
 }

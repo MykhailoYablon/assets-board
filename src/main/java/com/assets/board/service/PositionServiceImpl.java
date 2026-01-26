@@ -1,11 +1,15 @@
 package com.assets.board.service;
 
+import com.assets.board.entity.Position;
+import com.assets.board.mapper.PositionMapper;
 import com.assets.board.model.ib.IBPosition;
+import com.assets.board.repository.PositionRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -13,18 +17,22 @@ import java.util.List;
 @AllArgsConstructor
 public class PositionServiceImpl implements PositionService {
 
-    private IBFilesParser ibFilesParser;
+    private final IBFilesParser ibFilesParser;
+    private final PositionRepository positionRepository;
+    private final PositionMapper positionMapper;
+
 
     @Override
-    public List<IBPosition> getAllIBPositions() {
-        return List.of();
+    public List<IBPosition> getAllIBPositionsStatistics() {
+        List<Position> positions = positionRepository.findAll();
+        return positionMapper.toDtoList(positions);
     }
 
     @Override
-    public void addPositions(MultipartFile ibPositionsFile) {
-        List<IBPosition> ibPositions = ibFilesParser.parseIBPositions(ibPositionsFile);
-
-
+    public List<IBPosition> addPositions(MultipartFile ibPositionsFile) {
+        List<IBPosition> dtos = ibFilesParser.parseIBPositions(ibPositionsFile);
+        List<Position> entities = positionMapper.toEntityList(dtos);
+        List<Position> savedEntities = positionRepository.saveAll(entities);
+        return positionMapper.toDtoList(savedEntities);
     }
-
 }

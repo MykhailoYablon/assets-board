@@ -1,11 +1,12 @@
 package com.assets.board.model.ib;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.opencsv.bean.CsvBindByName;
 import lombok.Data;
 
 @Data
 public class IBPosition {
+
+    private Long id;
 
     @CsvBindByName(column = "Symbol")
     private String symbol;

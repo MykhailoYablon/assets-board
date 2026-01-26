@@ -1,6 +1,5 @@
 package com.assets.board.model.ai;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,6 +25,6 @@ public class Holding {
     private String timeWeightedReturn;
     private String unrealizedProfitLoss;
     private UserDefinedAttributes userDefinedAttributes;
-    private List<Position> positions;
+    private List<AiPosition> aiPositions;
 }
 

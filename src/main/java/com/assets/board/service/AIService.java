@@ -1,6 +1,7 @@
 package com.assets.board.service;
 
-import com.assets.board.model.ib.IBPosition;
+import com.assets.board.entity.Position;
+import com.assets.board.repository.PositionRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.Client;
@@ -8,7 +9,6 @@ import com.google.genai.types.GenerateContentResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -18,12 +18,12 @@ import java.util.List;
 @Slf4j
 public class AIService {
 
+    private final PositionRepository positionRepository;
     private final Client client;
     private final ObjectMapper objectMapper;
-    private final IBFilesParser ibFilesParser;
 
-    public String analyzePositions(MultipartFile ibPositionsFile) {
-        List<IBPosition> ibPositions = ibFilesParser.parseIBPositions(ibPositionsFile);
+    public String analyzePositions() {
+        List<Position> positions = positionRepository.findAll();
         //add analyze of holdings based on ai response
         // The client gets the API key from the environment variable `GEMINI_API_KEY`.
         GenerateContentResponse response;
@@ -42,12 +42,12 @@ public class AIService {
                             for both the mid-term and short-term. The report should be concise (up to 700 words)
                             and written in clear and accessible language so that both financial professionals and individuals
                             with limited financial knowledge can easily understand it.
-                            """ + objectMapper.writeValueAsString(ibPositions),
+                            """ + objectMapper.writeValueAsString(positions),
                     null);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
-
+        log.info("Review is done!");
         return response.text();
     }
 }

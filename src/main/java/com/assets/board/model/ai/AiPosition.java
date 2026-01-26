@@ -6,7 +6,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Position {
+public class AiPosition {
     private String symbol;
     private String quantity;
     private String currentPrice;
