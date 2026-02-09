@@ -1,7 +1,7 @@
 package com.assets.board.service;
 
-import com.assets.board.dto.DividendTaxDto;
-import com.assets.board.dto.TotalDividendTaxDto;
+import com.assets.board.dto.DividendTaxReportDto;
+import com.assets.board.dto.TotalTaxReportDto;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,7 @@ public class CsvService {
 
     private static final String NBU_EXCHANGE_RATE = "Дата,Курс $";
 
-    public void writeCsvReport(List<DividendTaxDto> taxReportList, TotalDividendTaxDto totals) {
+    public void writeCsvReport(List<DividendTaxReportDto> taxReportList, TotalTaxReportDto totals) {
         new File("exports/").mkdirs();
         String filePath = "exports/dividendsTaxReport.csv";
 

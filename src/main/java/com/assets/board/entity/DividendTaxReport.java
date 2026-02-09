@@ -1,10 +1,7 @@
 package com.assets.board.entity;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
-import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,22 +25,22 @@ public class DividendTaxReport {
     @Column(nullable = false)
     LocalDate date;
 
-    @Column(nullable = false, precision = 2, scale = 2)
+    @Column(nullable = false, precision = 10, scale = 4)
     BigDecimal amount;
 
     @Column(name = "nbu_rate", nullable = false, precision = 10, scale = 4)
     BigDecimal nbuRate;
 
-    @Column(name = "ua_brutto", nullable = false, precision = 2, scale = 2)
+    @Column(name = "ua_brutto", nullable = false, precision = 10, scale = 4)
     BigDecimal uaBrutto;
 
-    @Column(name = "tax_9", nullable = false, precision = 2, scale = 2)
+    @Column(name = "tax_9", nullable = false, precision = 10, scale = 4)
     BigDecimal tax9;
 
-    @Column(name = "military_tax_5", nullable = false, precision = 2, scale = 2)
+    @Column(name = "military_tax_5", nullable = false, precision = 10, scale = 4)
     BigDecimal militaryTax5;
 
-    @Column(name = "tax_sum", nullable = false, precision = 2, scale = 2)
+    @Column(name = "tax_sum", nullable = false, precision = 10, scale = 4)
     BigDecimal taxSum;
 
 }

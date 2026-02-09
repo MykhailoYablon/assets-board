@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -15,6 +16,9 @@ public class TotalTaxReport {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, unique = true)
+    private Short year;
 
     @Column(name = "total_amount", nullable = false, precision = 19, scale = 2)
     BigDecimal totalAmount;
@@ -31,7 +35,25 @@ public class TotalTaxReport {
     @Column(name = "total_tax_sum", nullable = false, precision = 19, scale = 2)
     BigDecimal totalTaxSum;
 
-    @OneToMany(mappedBy = "totalTaxReport", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "totalTaxReport", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @JsonManagedReference
-    List<DividendTaxReport> taxReports;
+    List<DividendTaxReport> taxReports = new ArrayList<>();
+
+    public void addTaxReport(DividendTaxReport report) {
+        taxReports.add(report);
+        report.setTotalTaxReport(this);
+    }
+
+    public void setTaxReports(List<DividendTaxReport> reports) {
+        // DON'T create new ArrayList - modify the existing one
+            this.taxReports.clear();
+        if (reports != null) {
+            reports.forEach(this::addTaxReport);  // Add new ones
+        }
+    }
+
+    // Add this method for clearing
+    public void clearTaxReports() {
+        this.taxReports.clear();
+    }
 }
