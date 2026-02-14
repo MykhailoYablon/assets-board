@@ -1,5 +1,6 @@
 package com.assets.board.entity;
 
+import com.assets.board.model.enums.ReportStatus;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -19,6 +20,10 @@ public class TotalTaxReport {
 
     @Column(nullable = false, unique = true)
     private Short year;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReportStatus status;
 
     @Column(name = "total_amount", nullable = false, precision = 19, scale = 2)
     BigDecimal totalAmount;

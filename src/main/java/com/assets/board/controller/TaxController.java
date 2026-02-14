@@ -29,8 +29,7 @@ public class TaxController {
 
 
     @GetMapping("/generate")
-    public ResponseEntity<String> generateXml() throws Exception {
-
+    public ResponseEntity<String> generateXml(@RequestParam("year") short year) throws Exception {
 
 //        taxService.generateUaTaxDeclarationXml();
 
