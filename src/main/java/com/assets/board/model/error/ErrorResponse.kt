@@ -1,11 +1,3 @@
-package com.assets.board.model.error;
+package com.assets.board.model.error
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-
-@Data
-@AllArgsConstructor
-public class ErrorResponse {
-    private String message;
-    private String details;
-}
+data class ErrorResponse(val message: String?, val details: String?)

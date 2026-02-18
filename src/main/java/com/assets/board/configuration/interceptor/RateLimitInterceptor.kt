@@ -1,58 +1,57 @@
-package com.assets.board.configuration.interceptor;
+package com.assets.board.configuration.interceptor
 
-import org.springframework.http.client.ClientHttpRequestInterceptor;
+import org.springframework.http.HttpRequest
+import org.springframework.http.client.ClientHttpRequestExecution
+import org.springframework.http.client.ClientHttpRequestInterceptor
+import org.springframework.http.client.ClientHttpResponse
+import java.io.IOException
+import java.time.Duration
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 
-import java.io.IOException;
-import java.time.Duration;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
+class RateLimitInterceptor(private val maxRequests: Int, period: Duration) : ClientHttpRequestInterceptor {
+    private val semaphore: Semaphore
+    private val scheduler: ScheduledExecutorService
+    private val period: Duration?
 
-public class RateLimitInterceptor implements ClientHttpRequestInterceptor {
-    private final Semaphore semaphore;
-    private final ScheduledExecutorService scheduler;
-    private final int maxRequests;
-    private final Duration period;
-
-    public RateLimitInterceptor(int maxRequests, Duration period) {
-        this.maxRequests = maxRequests;
-        this.period = period;
-        this.semaphore = new Semaphore(maxRequests);
-        this.scheduler = Executors.newScheduledThreadPool(1);
+    init {
+        this.period = period
+        this.semaphore = Semaphore(maxRequests)
+        this.scheduler = Executors.newScheduledThreadPool(1)
 
         // Schedule permit release
-        long periodMillis = period.toMillis();
-        long delayPerRequest = periodMillis / maxRequests;
+        val periodMillis = period.toMillis()
+        val delayPerRequest = periodMillis / maxRequests
 
         scheduler.scheduleAtFixedRate(
-                () -> {
-                    if (semaphore.availablePermits() < maxRequests) {
-                        semaphore.release();
-                    }
-                },
-                delayPerRequest,
-                delayPerRequest,
-                TimeUnit.MILLISECONDS
-        );
+            Runnable {
+                if (semaphore.availablePermits() < maxRequests) {
+                    semaphore.release()
+                }
+            },
+            delayPerRequest,
+            delayPerRequest,
+            TimeUnit.MILLISECONDS
+        )
     }
 
-    @Override
-    public org.springframework.http.client.ClientHttpResponse intercept(
-            org.springframework.http.HttpRequest request,
-            byte[] body,
-            org.springframework.http.client.ClientHttpRequestExecution execution) throws IOException {
-
+    @Throws(IOException::class)
+    override fun intercept(
+        request: HttpRequest,
+        body: ByteArray,
+        execution: ClientHttpRequestExecution
+    ): ClientHttpResponse {
         try {
             // Wait for available permit (blocks if rate limit reached)
-            semaphore.acquire();
+            semaphore.acquire()
 
             // Execute the request
-            return execution.execute(request, body);
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Rate limit interrupt", e);
+            return execution.execute(request, body)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw IOException("Rate limit interrupt", e)
         }
     }
 }

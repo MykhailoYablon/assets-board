@@ -1,17 +1,10 @@
-package com.assets.board.model.ai;
+package com.assets.board.model.ai
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserDefinedAttributes {
-    private String name;
-    private String category;
-    private String assetClass;
-    private String risk;
-    private String term;
-    private String liquidity;
-}
+class UserDefinedAttributes (
+    private var name: String? = null,
+    private var category: String? = null,
+    private var assetClass: String? = null,
+    private var risk: String? = null,
+    private var term: String? = null,
+    private var liquidity: String? = null
+)

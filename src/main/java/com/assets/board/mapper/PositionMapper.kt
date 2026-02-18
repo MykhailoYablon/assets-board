@@ -1,23 +1,20 @@
-package com.assets.board.mapper;
+package com.assets.board.mapper
 
-import com.assets.board.entity.Position;
-import com.assets.board.model.ib.IBPosition;
-import org.mapstruct.Mapper;
-
-import java.util.List;
+import com.assets.board.entity.Position
+import com.assets.board.model.ib.IBPosition
+import org.mapstruct.Mapper
 
 @Mapper(componentModel = "spring")
-public interface PositionMapper {
-
+interface PositionMapper {
     // DTO to Entity
-    Position toEntity(IBPosition dto);
+    fun toEntity(dto: IBPosition?): Position?
 
     // Entity to DTO
-    IBPosition toDto(Position entity);
+    fun toDto(entity: Position?): IBPosition?
 
     // List of DTOs to List of Entities
-    List<Position> toEntityList(List<IBPosition> dtoList);
+    fun toEntityList(dtoList: MutableList<IBPosition?>?): MutableList<Position?>?
 
     // List of Entities to List of DTOs
-    List<IBPosition> toDtoList(List<Position> entityList);
+    fun toDtoList(entityList: MutableList<Position?>?): MutableList<IBPosition?>?
 }

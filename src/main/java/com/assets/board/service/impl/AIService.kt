@@ -1,36 +1,33 @@
-package com.assets.board.service;
+package com.assets.board.service.impl
 
-import com.assets.board.entity.Position;
-import com.assets.board.repository.PositionRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.genai.Client;
-import com.google.genai.types.GenerateContentResponse;
-import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-
+import com.assets.board.repository.PositionRepository
+import com.fasterxml.jackson.core.JsonProcessingException
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.google.genai.Client
+import com.google.genai.types.GenerateContentResponse
+import mu.KotlinLogging
+import org.springframework.stereotype.Service
 
 @Service
-@AllArgsConstructor
-@Slf4j
-public class AIService {
+class AIService(
+    val positionRepository: PositionRepository,
+    val client: Client,
+    val objectMapper: ObjectMapper
 
-    private final PositionRepository positionRepository;
-    private final Client client;
-    private final ObjectMapper objectMapper;
+) {
 
-    public String analyzePositions() {
-        List<Position> positions = positionRepository.findAll();
+    private val logger = KotlinLogging.logger {}
+
+
+    fun analyzePositions(): String? {
+        val positions = positionRepository.findAll()
         //add analyze of holdings based on ai response
         // The client gets the API key from the environment variable `GEMINI_API_KEY`.
-        GenerateContentResponse response;
+        val response: GenerateContentResponse
         try {
             response = client.models.generateContent(
-                    "gemini-2.5-flash",
-                    """
+                "gemini-2.5-flash",
+                """
                             Imagine you are a financial advisor with 50 years of experience.
                             Conduct an analysis of the current portfolio provided in JSON format.
                             In your analysis, consider the key risks arising from the current asset allocation and market conditions,
@@ -42,12 +39,14 @@ public class AIService {
                             for both the mid-term and short-term. The report should be concise (up to 700 words)
                             and written in clear and accessible language so that both financial professionals and individuals
                             with limited financial knowledge can easily understand it.
-                            """ + objectMapper.writeValueAsString(positions),
-                    null);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+                            
+                            """.trimIndent() + objectMapper.writeValueAsString(positions),
+                null
+            )
+        } catch (e: JsonProcessingException) {
+            throw RuntimeException(e)
         }
-        log.info("Review is done!");
-        return response.text();
+        logger.info("Review is done!")
+        return response.text()
     }
 }

@@ -1,38 +1,35 @@
-package com.assets.board.configuration;
+package com.assets.board.configuration
 
-import com.assets.board.configuration.interceptor.RateLimitInterceptor;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.ClientHttpRequestInterceptor;
-import org.springframework.web.client.RestClient;
-
-import java.time.Duration;
+import com.assets.board.configuration.interceptor.RateLimitInterceptor
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.http.client.ClientHttpRequestInterceptor
+import org.springframework.web.client.RestClient
+import java.time.Duration
 
 @Configuration
-public class RestClientConfig {
-
+open class RestClientConfig {
     @Bean
     @Qualifier("twelveClient")
-    public RestClient twelveClient(@Qualifier("rateLimitInterceptor") ClientHttpRequestInterceptor interceptor) {
+    open fun twelveClient(@Qualifier("rateLimitInterceptor") interceptor: ClientHttpRequestInterceptor): RestClient {
         return RestClient.builder()
-                .baseUrl("https://api.twelvedata.com") // Your API base URL
-                .requestInterceptor(interceptor)
-                .build();
+            .baseUrl("https://api.twelvedata.com") // Your API base URL
+            .requestInterceptor(interceptor)
+            .build()
     }
 
     @Bean
     @Qualifier("nbuClient")
-    public RestClient nbuClient() {
+    open fun nbuClient(): RestClient {
         return RestClient.builder()
-                .baseUrl("https://bank.gov.ua") // Your API base URL
-                .build();
+            .baseUrl("https://bank.gov.ua") // Your API base URL
+            .build()
     }
 
     @Bean
     @Qualifier("rateLimitInterceptor")
-    public ClientHttpRequestInterceptor rateLimitInterceptor() {
-        return new RateLimitInterceptor(4, Duration.ofMinutes(1));
+    open fun rateLimitInterceptor(): ClientHttpRequestInterceptor {
+        return RateLimitInterceptor(4, Duration.ofMinutes(1))
     }
-
 }

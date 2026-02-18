@@ -1,40 +1,39 @@
-package com.assets.board.model.ib;
+package com.assets.board.model.ib
 
-import com.opencsv.bean.CsvBindByName;
-import lombok.Data;
+import com.opencsv.bean.CsvBindByName
+import lombok.Data
 
 @Data
-public class IBPosition {
-
-    private Long id;
+data class IBPosition (
+    private val id: Long? = null,
 
     @CsvBindByName(column = "Symbol")
-    private String symbol;
+    private val symbol: String? = null,
 
     @CsvBindByName(column = "Description")
-    private String description;
+    private val description: String? = null,
 
     @CsvBindByName(column = "Quantity")
-    private Integer quantity;
+    private val quantity: Int? = null,
 
     @CsvBindByName(column = "MarkPrice")
-    private Double markPrice;
+    private val markPrice: Double? = null,
 
     @CsvBindByName(column = "PositionValue")
-    private Double positionValue;
+    private val positionValue: Double? = null,
 
     @CsvBindByName(column = "OpenPrice")
-    private Double openPrice;
+    private val openPrice: Double? = null,
 
     @CsvBindByName(column = "CostBasisPrice")
-    private Double costBasisPrice;
+    private val costBasisPrice: Double? = null,
 
     @CsvBindByName(column = "FifoPnlUnrealized")
-    private Double fifoPnlUnrealized;
+    private val fifoPnlUnrealized: Double? = null,
 
     @CsvBindByName(column = "HoldingPeriodDateTime")
-    private String holdingPeriodDateTime;
+    private val holdingPeriodDateTime: String? = null,
 
     @CsvBindByName(column = "Weight")
-    private Double weight;
-}
+    private val weight: Double? = null
+)

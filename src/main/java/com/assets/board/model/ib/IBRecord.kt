@@ -1,48 +1,47 @@
-package com.assets.board.model.ib;
+package com.assets.board.model.ib
 
-import com.opencsv.bean.CsvBindByPosition;
-import lombok.Data;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.opencsv.bean.CsvBindByPosition
+import lombok.Data
+import java.math.BigDecimal
+import java.time.LocalDate
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 
 @Data
-public class IBRecord {
-
-    private static final Pattern SYMBOL_PATTERN = Pattern.compile("^([A-Z]+)(?=\\()");
-
+data class IBRecord (
     @CsvBindByPosition(position = 0)
-    private String recordType;
+    private val recordType: String? = null,
 
     @CsvBindByPosition(position = 1)
-    private String dataType;
+    private val dataType: String? = null,
 
     @CsvBindByPosition(position = 3)
-    private String date;
+    private val date: String? = null,
 
     @CsvBindByPosition(position = 4)
-    private String description;
+    private val description: String? = null,
 
     @CsvBindByPosition(position = 5)
-    private BigDecimal amount;
+    private val amount: BigDecimal? = null
+) {
 
-    public String getSymbol() {
-        if (description == null) return null;
-        Matcher matcher = SYMBOL_PATTERN.matcher(description);
-        return matcher.find() ? matcher.group(1) : null;
-    }
+    val symbol: String?
+        get() {
+            if (description == null) return null
+            val matcher: Matcher = SYMBOL_PATTERN.matcher(description)
+            return if (matcher.find()) matcher.group(1) else null
+        }
 
-    public LocalDate getDateAsLocalDate() {
-        return date != null ? LocalDate.parse(date) : null;
-    }
+    val dateAsLocalDate: LocalDate?
+        get() = if (date != null) LocalDate.parse(date) else null
 
-    public boolean isDividend() {
-        return "Dividends".equals(recordType) && "Data".equals(dataType) && !"Total".equals(date);
-    }
+    val isDividend: Boolean
+        get() = "Dividends" == recordType && "Data" == dataType && ("Total" != date)
 
-    public boolean isWithholdingTax() {
-        return "Withholding Tax".equals(recordType) && "Data".equals(dataType);
+    val isWithholdingTax: Boolean
+        get() = "Withholding Tax" == recordType && "Data" == dataType
+
+    companion object {
+        private val SYMBOL_PATTERN: Pattern = Pattern.compile("^([A-Z]+)(?=\\()")
     }
 }

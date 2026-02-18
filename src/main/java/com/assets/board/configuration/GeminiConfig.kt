@@ -1,14 +1,13 @@
-package com.assets.board.configuration;
+package com.assets.board.configuration
 
-import com.google.genai.Client;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import com.google.genai.Client
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 
 @Configuration
-public class GeminiConfig {
-
+open class GeminiConfig {
     @Bean
-    public Client geminiClient() {
-        return new Client();
+    open fun geminiClient(): Client {
+        return Client()
     }
 }

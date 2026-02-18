@@ -1,44 +1,43 @@
-package com.assets.board.entity;
+package com.assets.board.entity
 
-import jakarta.persistence.*;
-import lombok.Data;
+import jakarta.persistence.*
+import lombok.Data
 
 @Data
 @Entity
 @Table(name = "positions")
-public class Position {
-
+open class Position (
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    val id: Long? = null,
 
     @Column(name = "symbol")
-    private String symbol;
+    var symbol: String? = null,
 
     @Column(name = "description", length = 500)
-    private String description;
+    var description: String? = null,
 
     @Column(name = "quantity")
-    private Integer quantity;
+    var quantity: Int? = null,
 
     @Column(name = "mark_price")
-    private Double markPrice;
+    var markPrice: Double? = null,
 
     @Column(name = "position_value")
-    private Double positionValue;
+    var positionValue: Double? = null,
 
     @Column(name = "open_price")
-    private Double openPrice;
+    var openPrice: Double? = null,
 
     @Column(name = "cost_basis_price")
-    private Double costBasisPrice;
+    var costBasisPrice: Double? = null,
 
     @Column(name = "fifo_pnl_unrealized")
-    private Double fifoPnlUnrealized;
+    var fifoPnlUnrealized: Double? = null,
 
     @Column(name = "holding_period_date_time")
-    private String holdingPeriodDateTime;
+    var holdingPeriodDateTime: String? = null,
 
     @Column(name = "weight")
-    private Double weight;
-}
+    var weight: Double? = null
+)

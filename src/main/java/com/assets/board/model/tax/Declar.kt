@@ -1,44 +1,40 @@
-package com.assets.board.model.tax;
+package com.assets.board.model.tax
 
-import jakarta.xml.bind.annotation.*;
-import lombok.Data;
+import jakarta.xml.bind.annotation.*
+import lombok.Data
 
 @Data
 @XmlRootElement(name = "DECLAR")
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlSeeAlso({DeclarBody.class, DeclarBodyF1.class})
-public class Declar {
-
-    @XmlAttribute(name = "noNamespaceSchemaLocation",
-            namespace = "http://www.w3.org/2001/XMLSchema-instance")
-    private String schemaLocation;
+@XmlSeeAlso(DeclarBody::class, DeclarBodyF1::class)
+class Declar {
+    @XmlAttribute(name = "noNamespaceSchemaLocation", namespace = "http://www.w3.org/2001/XMLSchema-instance")
+    var schemaLocation: String? = null
 
     @XmlElement(name = "DECLARHEAD", required = true)
-    private DeclarHead declarHead;
+    var declarHead: DeclarHead? = null
 
-    @XmlElements({
-            @XmlElement(name = "DECLARBODY", type = DeclarBody.class),
-            @XmlElement(name = "DECLARBODY", type = DeclarBodyF1.class)
-    })
-    private Object declarBody;
+    @XmlElements(
+        XmlElement(name = "DECLARBODY", type = DeclarBody::class),
+        XmlElement(name = "DECLARBODY", type = DeclarBodyF1::class)
+    )
+    var declarBody: Any? = null
 
-    // Helper methods
-    public DeclarBody getDeclarBodyMain() {
-        return declarBody instanceof DeclarBody ? (DeclarBody) declarBody : null;
+    val declarBodyMain: DeclarBody?
+        // Helper methods
+        get() = if (declarBody is DeclarBody) declarBody as DeclarBody else null
+
+    val declarBodyF1: DeclarBodyF1?
+        get() = if (declarBody is DeclarBodyF1) declarBody as DeclarBodyF1 else null
+
+    fun setDeclarBody(body: DeclarBody?) {
+        this.declarBody = body
+        this.schemaLocation = "F0100214.xsd"
     }
 
-    public DeclarBodyF1 getDeclarBodyF1() {
-        return declarBody instanceof DeclarBodyF1 ? (DeclarBodyF1) declarBody : null;
-    }
-
-    public void setDeclarBody(DeclarBody body) {
-        this.declarBody = body;
-        this.schemaLocation = "F0100214.xsd";
-    }
-
-    public void setDeclarBody(DeclarBodyF1 body) {
-        this.declarBody = body;
-        this.schemaLocation = "F0121214.xsd";
+    fun setDeclarBody(body: DeclarBodyF1?) {
+        this.declarBody = body
+        this.schemaLocation = "F0121214.xsd"
     }
 }
 

@@ -1,7 +1,6 @@
-package com.assets.board.model.enums;
+package com.assets.board.model.enums
 
-public enum ReportStatus {
-
+enum class ReportStatus {
     CALCULATED,
     COMPLETED,
     FAILED

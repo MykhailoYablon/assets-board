@@ -1,45 +1,45 @@
-package com.assets.board.controller;
+package com.assets.board.controller
 
-import com.assets.board.dto.TotalTaxReportDto;
-import com.assets.board.service.TaxService;
-import com.assets.board.service.XmlGeneratorService;
-import lombok.AllArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import com.assets.board.dto.TotalTaxReportDto
+import com.assets.board.service.TaxService
+import com.assets.board.service.impl.XmlGeneratorService
+import lombok.AllArgsConstructor
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
 
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = ["*"])
 @RestController
 @RequestMapping("/taxes")
 @AllArgsConstructor
-public class TaxController {
-
-
-    private final TaxService taxService;
-    private final XmlGeneratorService xmlGeneratorService;
-
+class TaxController(
+    val taxService: TaxService,
+    val xmlGeneratorService: XmlGeneratorService
+) {
     @PostMapping("/dividends")
-    public TotalTaxReportDto calculateDividendTaxes(@RequestParam("year") short year,
-                                                    @RequestParam("file") MultipartFile ibReportFile,
-                                                    @RequestParam boolean isMilitary) {
-        return taxService.calculateDividendTax(year, ibReportFile, isMilitary);
+    fun calculateDividendTaxes(
+        @RequestParam("year") year: Short,
+        @RequestParam("file") ibReportFile: MultipartFile,
+        @RequestParam isMilitary: Boolean
+    ): TotalTaxReportDto {
+        return taxService.calculateDividendTax(year, ibReportFile, isMilitary)
     }
 
 
     @GetMapping("/generate")
-    public ResponseEntity<String> generateXml(@RequestParam("year") short year) throws Exception {
-
-//        taxService.generateUaTaxDeclarationXml();
+    @Throws(Exception::class)
+    fun generateXml(@RequestParam("year") year: Short): ResponseEntity<String?> {
+        //        taxService.generateUaTaxDeclarationXml();
 
 //        String xml = xmlGeneratorService.generateDeclarXml(declar);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_XML);
+        val headers = HttpHeaders()
+        headers.contentType = MediaType.APPLICATION_XML
 
         return ResponseEntity.ok()
-                .headers(headers)
-                .body("OK");
+            .headers(headers)
+            .body<String?>("OK")
     }
 }

@@ -1,38 +1,32 @@
-package com.assets.board.controller;
+package com.assets.board.controller
 
-import com.assets.board.model.ib.IBPosition;
-import com.assets.board.service.AIService;
-import com.assets.board.service.PositionService;
-import lombok.AllArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import com.assets.board.model.ib.IBPosition
+import com.assets.board.service.PositionService
+import com.assets.board.service.impl.AIService
+import lombok.AllArgsConstructor
+import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
 
-import java.util.List;
-
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = ["*"])
 @RestController
 @RequestMapping("/positions")
 @AllArgsConstructor
-public class PositionController {
-
-    private final PositionService positionService;
-    private final AIService aiService;
-
+class PositionController(
+    val positionService: PositionService,
+    val aiService: AIService
+) {
     @PostMapping
-    public List<IBPosition> addPositions(@RequestParam("file") MultipartFile ibPositionsFile) {
+    fun addPositions(@RequestParam("file") ibPositionsFile: MultipartFile): MutableList<IBPosition?>? {
         //Save File as entity for historic comparison?
         //Show only latest positions?
-        return positionService.addPositions(ibPositionsFile);
+        return positionService.addPositions(ibPositionsFile)
     }
 
-    @GetMapping("/all")
-    public List<IBPosition> getAllPositions() {
-        return positionService.getAllIBPositionsStatistics();
-    }
+    @get:GetMapping("/all")
+    val allPositions: MutableList<IBPosition?>?
+        get() = positionService.allIBPositionsStatistics()
 
-    @GetMapping("/ai")
-    public String getAiSummary() {
-        return aiService.analyzePositions();
-    }
-
+    @get:GetMapping("/ai")
+    val aiSummary: String?
+        get() = aiService.analyzePositions()
 }

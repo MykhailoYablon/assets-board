@@ -1,26 +1,24 @@
-package com.assets.board.model.tax;
+package com.assets.board.model.tax
 
-import jakarta.xml.bind.annotation.XmlAccessType;
-import jakarta.xml.bind.annotation.XmlAccessorType;
-import jakarta.xml.bind.annotation.XmlAttribute;
-import jakarta.xml.bind.annotation.XmlValue;
-import lombok.Data;
+import jakarta.xml.bind.annotation.XmlAccessType
+import jakarta.xml.bind.annotation.XmlAccessorType
+import jakarta.xml.bind.annotation.XmlAttribute
+import jakarta.xml.bind.annotation.XmlValue
+import lombok.Data
 
 @Data
 @XmlAccessorType(XmlAccessType.FIELD)
-public class RowNumField {
-
+class RowNumField {
     @XmlAttribute(name = "ROWNUM")
-    private String rowNum;
+    var rowNum: String? = null
 
     @XmlValue
-    private String value;
+    var value: String? = null
 
-    public RowNumField() {
-    }
+    constructor()
 
-    public RowNumField(String rowNum, String value) {
-        this.rowNum = rowNum;
-        this.value = value;
+    constructor(rowNum: String?, value: String?) {
+        this.rowNum = rowNum
+        this.value = value
     }
 }

@@ -1,64 +1,54 @@
-package com.assets.board.entity;
+package com.assets.board.entity
 
-import com.assets.board.model.enums.ReportStatus;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-import jakarta.persistence.*;
-import lombok.Data;
-
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
+import com.assets.board.model.enums.ReportStatus
+import com.fasterxml.jackson.annotation.JsonManagedReference
+import jakarta.persistence.*
+import lombok.Data
+import java.math.BigDecimal
+import java.util.function.Consumer
 
 @Entity
 @Table(name = "total_tax_report")
 @Data
-public class TotalTaxReport {
-
+open class TotalTaxReport (
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    val id: Long? = null,
 
     @Column(nullable = false, unique = true)
-    private Short year;
+    var year: Short? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ReportStatus status;
+    var status: ReportStatus? = null,
 
     @Column(name = "total_amount", nullable = false, precision = 19, scale = 2)
-    BigDecimal totalAmount;
+    var totalAmount: BigDecimal? = null,
 
     @Column(name = "total_ua_brutto", nullable = false, precision = 19, scale = 2)
-    BigDecimal totalUaBrutto;
+    var totalUaBrutto: BigDecimal? = null,
 
     @Column(name = "total_tax_9", nullable = false, precision = 19, scale = 2)
-    BigDecimal totalTax9;
+    var totalTax9: BigDecimal? = null,
 
     @Column(name = "total_military_tax_5", nullable = false, precision = 19, scale = 2)
-    BigDecimal totalMilitaryTax5;
+    var totalMilitaryTax5: BigDecimal? = null,
 
     @Column(name = "total_tax_sum", nullable = false, precision = 19, scale = 2)
-    BigDecimal totalTaxSum;
+    var totalTaxSum: BigDecimal? = null,
 
-    @OneToMany(mappedBy = "totalTaxReport", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "totalTaxReport", cascade = [CascadeType.ALL], fetch = FetchType.LAZY, orphanRemoval = true)
     @JsonManagedReference
-    List<DividendTaxReport> taxReports = new ArrayList<>();
+    var taxReports: MutableList<DividendTaxReport?> = ArrayList()
+) {
 
-    public void addTaxReport(DividendTaxReport report) {
-        taxReports.add(report);
-        report.setTotalTaxReport(this);
-    }
-
-    public void setTaxReports(List<DividendTaxReport> reports) {
-        // DON'T create new ArrayList - modify the existing one
-            this.taxReports.clear();
-        if (reports != null) {
-            reports.forEach(this::addTaxReport);  // Add new ones
-        }
+    fun addTaxReport(report: DividendTaxReport) {
+        taxReports.add(report)
+        report.totalTaxReport = this
     }
 
     // Add this method for clearing
-    public void clearTaxReports() {
-        this.taxReports.clear();
+    fun clearTaxReports() {
+        this.taxReports.clear()
     }
 }

@@ -1,21 +1,22 @@
-package com.assets.board.repository;
+package com.assets.board.repository
 
-import com.assets.board.entity.ExchangeRate;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import com.assets.board.entity.ExchangeRate
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import org.springframework.stereotype.Repository
+import java.time.LocalDate
+import java.util.*
 
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
+@Repository
+interface ExchangeRateRepository : JpaRepository<ExchangeRate?, Long?> {
+    fun findByDate(date: LocalDate?): ExchangeRate?
 
-public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Long> {
+    fun findByDateBetween(start: LocalDate?, end: LocalDate?): MutableList<ExchangeRate?>?
 
-    Optional<ExchangeRate> findByDate(LocalDate date);
-
-    List<ExchangeRate> findByDateBetween(LocalDate start, LocalDate end);
-
-    @Query("SELECT e FROM ExchangeRate e WHERE e.date = " +
-            "(SELECT MAX(e2.date) FROM ExchangeRate e2 WHERE e2.date <= :date)")
-    Optional<ExchangeRate> findLatestBeforeOrOn(@Param("date") LocalDate date);
+    @Query(
+        "SELECT e FROM ExchangeRate e WHERE e.date = " +
+                "(SELECT MAX(e2.date) FROM ExchangeRate e2 WHERE e2.date <= :date)"
+    )
+    fun findLatestBeforeOrOn(@Param("date") date: LocalDate?): Optional<ExchangeRate?>?
 }

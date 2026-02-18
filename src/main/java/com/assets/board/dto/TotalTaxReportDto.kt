@@ -1,25 +1,13 @@
-package com.assets.board.dto;
+package com.assets.board.dto
 
-import lombok.Data;
+import java.math.BigDecimal
 
-import java.math.BigDecimal;
-import java.util.List;
-
-@Data
-public class TotalTaxReportDto {
-
-    Short year;
-    BigDecimal totalAmount;
-    BigDecimal totalUaBrutto;
-    BigDecimal totalTax9;
-    BigDecimal totalMilitaryTax5;
-    BigDecimal totalTaxSum;
-    List<DividendTaxReportDto> taxReportDtos;
-
-//    BigDecimal totalUsTaxUSD;
-//    BigDecimal totalUsTaxUAH;
-//    BigDecimal totalTaxUAH;
-//    BigDecimal totalUsNetto;
-//    BigDecimal totalUaNetto;
-//    BigDecimal totalDividendsNetto;
-}
+data class TotalTaxReportDto (
+    var year: Short? = null,
+    var totalAmount: BigDecimal? = null,
+    var totalUaBrutto: BigDecimal? = null,
+    var totalTax9: BigDecimal? = null,
+    var totalMilitaryTax5: BigDecimal? = null,
+    var totalTaxSum: BigDecimal? = null,
+    var taxReportDtos: MutableList<DividendTaxReportDto?>? = null
+)

@@ -1,13 +1,10 @@
-package com.assets.board.service;
+package com.assets.board.service
 
-import com.assets.board.model.ib.IBPosition;
-import org.springframework.web.multipart.MultipartFile;
+import com.assets.board.model.ib.IBPosition
+import org.springframework.web.multipart.MultipartFile
 
-import java.util.List;
+interface PositionService {
+    fun allIBPositionsStatistics(): MutableList<IBPosition?>?
 
-public interface PositionService {
-
-    List<IBPosition> getAllIBPositionsStatistics();
-
-    List<IBPosition> addPositions(MultipartFile ibPositionsFile);
+    fun addPositions(ibPositionsFile: MultipartFile): MutableList<IBPosition?>?
 }

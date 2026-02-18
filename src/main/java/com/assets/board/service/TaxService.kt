@@ -1,11 +1,11 @@
-package com.assets.board.service;
+package com.assets.board.service
 
-import com.assets.board.dto.TotalTaxReportDto;
-import org.springframework.web.multipart.MultipartFile;
+import com.assets.board.dto.TotalTaxReportDto
+import org.springframework.web.multipart.MultipartFile
 
-public interface TaxService {
+interface TaxService {
+    fun calculateDividendTax(year: Short, ibReportFile: MultipartFile, isMilitary: Boolean): TotalTaxReportDto
 
-    TotalTaxReportDto calculateDividendTax(short year, MultipartFile ibReportFile, boolean isMilitary);
-
-    void generateUaTaxDeclarationXml(short year) throws Exception;
+    @Throws(Exception::class)
+    fun generateUaTaxDeclarationXml(year: Short)
 }

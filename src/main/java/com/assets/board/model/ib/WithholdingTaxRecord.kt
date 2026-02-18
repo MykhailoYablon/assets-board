@@ -1,27 +1,21 @@
-package com.assets.board.model.ib;
+package com.assets.board.model.ib
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.opencsv.bean.CsvBindByPosition;
-import lombok.Data;
-import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.opencsv.bean.CsvBindByPosition
+import java.math.BigDecimal
 
-import java.math.BigDecimal;
-
-@Setter
-@Data
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class WithholdingTaxRecord {
-
+data class WithholdingTaxRecord (
     @JsonProperty("symbol")
-    String symbol;
+    var symbol: String? = null,
 
     @CsvBindByPosition(position = 3)
-    private String date;
+    val date: String? = null,
 
     @CsvBindByPosition(position = 4)
-    private String description;
+    val description: String? = null,
 
     @CsvBindByPosition(position = 5)
-    private BigDecimal amount;
-}
+    val amount: BigDecimal? = null
+)

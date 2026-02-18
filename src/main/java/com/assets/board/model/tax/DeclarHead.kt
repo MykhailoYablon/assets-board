@@ -1,59 +1,58 @@
-package com.assets.board.model.tax;
+package com.assets.board.model.tax
 
-import jakarta.xml.bind.annotation.XmlAccessType;
-import jakarta.xml.bind.annotation.XmlAccessorType;
-import jakarta.xml.bind.annotation.XmlElement;
-import lombok.Data;
+import jakarta.xml.bind.annotation.XmlAccessType
+import jakarta.xml.bind.annotation.XmlAccessorType
+import jakarta.xml.bind.annotation.XmlElement
+import lombok.Data
 
 @Data
 @XmlAccessorType(XmlAccessType.FIELD)
-public class DeclarHead {
-
+class DeclarHead {
     @XmlElement(name = "TIN")
-    private String tin;
+    var tin: String? = null
 
     @XmlElement(name = "C_DOC")
-    private String cDoc;
+    var cDoc: String? = null
 
     @XmlElement(name = "C_DOC_SUB")
-    private String cDocSub;
+    var cDocSub: String? = null
 
     @XmlElement(name = "C_DOC_VER")
-    private String cDocVer;
+    var cDocVer: String? = null
 
     @XmlElement(name = "C_DOC_TYPE")
-    private String cDocType;
+    var cDocType: String? = null
 
     @XmlElement(name = "C_DOC_CNT")
-    private String cDocCnt;
+    var cDocCnt: String? = null
 
     @XmlElement(name = "C_REG")
-    private String cReg;
+    var cReg: String? = null
 
     @XmlElement(name = "C_RAJ")
-    private String cRaj;
+    var cRaj: String? = null
 
     @XmlElement(name = "PERIOD_MONTH")
-    private String periodMonth;
+    var periodMonth: String? = null
 
     @XmlElement(name = "PERIOD_TYPE")
-    private String periodType;
+    var periodType: String? = null
 
     @XmlElement(name = "PERIOD_YEAR")
-    private String periodYear;
+    var periodYear: String? = null
 
     @XmlElement(name = "C_STI_ORIG")
-    private String cStiOrig;
+    var cStiOrig: String? = null
 
     @XmlElement(name = "C_DOC_STAN")
-    private String cDocStan;
+    var cDocStan: String? = null
 
     @XmlElement(name = "LINKED_DOCS")
-    private LinkedDocs linkedDocs;
+    var linkedDocs: LinkedDocs? = null
 
     @XmlElement(name = "D_FILL")
-    private String dFill;
+    var dFill: String? = null
 
     @XmlElement(name = "SOFTWARE")
-    private String software;
+    var software: String? = null
 }

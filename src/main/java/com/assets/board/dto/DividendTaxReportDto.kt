@@ -1,51 +1,28 @@
-package com.assets.board.dto;
+package com.assets.board.dto
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonProperty
+import java.math.BigDecimal
+import java.time.LocalDate
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
+data class DividendTaxReportDto (
+    var symbol: String? = null,
 
-@Data
-public class DividendTaxReportDto {
+    var date: LocalDate? = null,
 
-    String symbol;
+    var amount: BigDecimal? = null,
 
-    LocalDate date;
+    @field:JsonProperty("nbuRate")
+    var nbuRate: BigDecimal? = null,
 
-    BigDecimal amount;
+    @field:JsonProperty("uaBrutto")
+    var uaBrutto: BigDecimal? = null,
 
-    @JsonProperty("nbuRate")
-    BigDecimal nbuRate;
+    @field:JsonProperty("tax9")
+    var tax9: BigDecimal? = null,
 
-    @JsonProperty("uaBrutto")
-    BigDecimal uaBrutto;
+    @field:JsonProperty("militaryTax5")
+    var militaryTax5: BigDecimal? = null,
 
-    @JsonProperty("tax9")
-    BigDecimal tax9;
-
-    @JsonProperty("militaryTax5")
-    BigDecimal militaryTax5;
-
-    @JsonProperty("taxSum")
-    BigDecimal taxSum;
-
-//    @JsonProperty("usTaxUSD")
-//    BigDecimal usTaxUSD;
-//
-//    @JsonProperty("usTaxUAH")
-//    BigDecimal usTaxUAH;
-//
-//    @JsonProperty("totalTaxUAH")
-//    BigDecimal totalTaxUAH;
-//
-//    @JsonProperty("usNetto")
-//    BigDecimal usNetto;
-//
-//    @JsonProperty("uaNetto")
-//    BigDecimal uaNetto;
-//
-//    @JsonProperty("dividends$Netto")
-//    BigDecimal dividends$Netto;
-
-}
+    @field:JsonProperty("taxSum")
+    var taxSum: BigDecimal? = null
+)

@@ -1,39 +1,38 @@
-package com.assets.board.model.tax;
+package com.assets.board.model.tax
 
-import jakarta.xml.bind.annotation.XmlAccessType;
-import jakarta.xml.bind.annotation.XmlAccessorType;
-import jakarta.xml.bind.annotation.XmlAttribute;
-import jakarta.xml.bind.annotation.XmlElement;
-import lombok.Data;
+import jakarta.xml.bind.annotation.XmlAccessType
+import jakarta.xml.bind.annotation.XmlAccessorType
+import jakarta.xml.bind.annotation.XmlAttribute
+import jakarta.xml.bind.annotation.XmlElement
+import lombok.Data
 
 @Data
 @XmlAccessorType(XmlAccessType.FIELD)
-public class Doc {
-
+class Doc {
     @XmlAttribute(name = "NUM")
-    private String num;
+    var num: String? = null
 
     @XmlAttribute(name = "TYPE")
-    private String type;
+    var type: String? = null
 
     @XmlElement(name = "C_DOC")
-    private String cDoc;
+    var cDoc: String? = null
 
     @XmlElement(name = "C_DOC_SUB")
-    private String cDocSub;
+    var cDocSub: String? = null
 
     @XmlElement(name = "C_DOC_VER")
-    private String cDocVer;
+    var cDocVer: String? = null
 
     @XmlElement(name = "C_DOC_TYPE")
-    private String cDocType;
+    var cDocType: String? = null
 
     @XmlElement(name = "C_DOC_CNT")
-    private String cDocCnt;
+    var cDocCnt: String? = null
 
     @XmlElement(name = "C_DOC_STAN")
-    private String cDocStan;
+    var cDocStan: String? = null
 
     @XmlElement(name = "FILENAME")
-    private String filename;
+    var filename: String? = null
 }

@@ -1,18 +1,14 @@
-package com.assets.board.model.tax;
+package com.assets.board.model.tax
 
-import jakarta.xml.bind.annotation.adapters.XmlAdapter;
+import jakarta.xml.bind.annotation.adapters.XmlAdapter
+import java.math.BigDecimal
 
-import java.math.BigDecimal;
-
-// Custom adapter for BigDecimal formatting
-class BigDecimalAdapter extends XmlAdapter<String, BigDecimal> {
-    @Override
-    public BigDecimal unmarshal(String v) {
-        return v == null ? null : new BigDecimal(v);
+internal class BigDecimalAdapter : XmlAdapter<String?, BigDecimal?>() {
+    override fun unmarshal(v: String?): BigDecimal? {
+        return if (v == null) null else BigDecimal(v)
     }
 
-    @Override
-    public String marshal(BigDecimal v) {
-        return v == null ? null : v.toPlainString();
+    override fun marshal(v: BigDecimal?): String? {
+        return v?.toPlainString()
     }
 }

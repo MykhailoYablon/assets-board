@@ -1,30 +1,12 @@
-package com.assets.board.model.ai;
+package com.assets.board.model.ai
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.util.List;
-
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-//@Entity
-//@Table(name = "holding")
-public class Holding {
-
-//    @Id
-//    @GeneratedValue(strategy = GenerationType.IDENTITY)
-//    private Long id;
-
-    private String type;
-    private String cashBalance;
-    private String netWorth;
-    private String timeWeightedReturn;
-    private String unrealizedProfitLoss;
-    private UserDefinedAttributes userDefinedAttributes;
-    private List<AiPosition> aiPositions;
-}
+data class Holding (
+    private var type: String? = null,
+    private var cashBalance: String? = null,
+    private var netWorth: String? = null,
+    private var timeWeightedReturn: String? = null,
+    private var unrealizedProfitLoss: String? = null,
+    private var userDefinedAttributes: UserDefinedAttributes? = null,
+    private var aiPositions: MutableList<AiPosition?>? = null
+)
 
