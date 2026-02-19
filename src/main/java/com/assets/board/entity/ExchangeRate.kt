@@ -6,7 +6,7 @@ import java.time.LocalDate
 
 @Entity
 @Table(name = "exchange_rates", uniqueConstraints = [UniqueConstraint(columnNames = ["date"])])
-open class ExchangeRate (
+data class ExchangeRate (
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,

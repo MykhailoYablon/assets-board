@@ -6,7 +6,7 @@ import java.time.LocalDate
 
 @Entity
 @Table(name = "dividend_tax_report")
-open class DividendTaxReport(
+data class DividendTaxReport(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private val id: Long? = null,

@@ -3,10 +3,9 @@ package com.assets.board.entity
 import jakarta.persistence.*
 import lombok.Data
 
-@Data
 @Entity
 @Table(name = "positions")
-open class Position (
+data class Position (
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,

@@ -9,8 +9,7 @@ import java.util.function.Consumer
 
 @Entity
 @Table(name = "total_tax_report")
-@Data
-open class TotalTaxReport (
+data class TotalTaxReport(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
