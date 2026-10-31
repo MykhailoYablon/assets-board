@@ -43,11 +43,10 @@ public class NbuDataClient {
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {
                 });
-        BigDecimal exchangeRate = Optional.ofNullable(rate)
+        return Optional.ofNullable(rate)
                 .map(List::getFirst)
                 .map(NbuExchangeRate::getRate)
                 .map(BigDecimal::new)
                 .orElse(BigDecimal.ZERO);
-        return exchangeRate;
     }
 }

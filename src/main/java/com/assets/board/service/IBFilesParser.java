@@ -1,10 +1,4 @@
 package com.assets.board.service;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.StringReader;
-import java.math.BigDecimal;
-import java.time.LocalDate;
 
 import com.assets.board.model.ib.DividendRecord;
 import com.assets.board.model.ib.IBPosition;
@@ -16,6 +10,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringReader;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -66,41 +66,45 @@ public class IBFilesParser {
         }
     }
 
-    public ParsedData parseDividendFile(Reader reader) throws Exception {
-        BufferedReader bufferedReader = new BufferedReader(reader);
+    public ParsedData parseIBFile(MultipartFile ibReportFile) {
+        try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
+            BufferedReader bufferedReader = new BufferedReader(reader);
 
-        List<String> dividendLines = new ArrayList<>();
-        List<String> withholdingTaxLines = new ArrayList<>();
+            List<String> dividendLines = new ArrayList<>();
+            List<String> withholdingTaxLines = new ArrayList<>();
 
-        String line;
-        String currentSection = null;
+            String line;
+            String currentSection = null;
 
-        while ((line = bufferedReader.readLine()) != null) {
-            String[] parts = line.split(",", 2);
+            while ((line = bufferedReader.readLine()) != null) {
+                String[] parts = line.split(",", 2);
 
-            if (parts.length > 0) {
-                String firstColumn = parts[0].trim();
+                if (parts.length > 0) {
+                    String firstColumn = parts[0].trim();
 
-                // Check if this is a header line
-                if (line.contains(",Header,")) {
-                    currentSection = firstColumn;
-                }
-                // Check if this is a data line
-                else if (line.contains(",Data,")) {
-                    if ("Dividends".equals(currentSection)) {
-                        dividendLines.add(line);
-                    } else if ("Withholding Tax".equals(currentSection)) {
-                        withholdingTaxLines.add(line);
+                    // Check if this is a header line
+                    if (line.contains(",Header,")) {
+                        currentSection = firstColumn;
+                    }
+                    // Check if this is a data line
+                    else if (line.contains(",Data,")) {
+                        if ("Dividends".equals(currentSection)) {
+                            dividendLines.add(line);
+                        } else if ("Withholding Tax".equals(currentSection)) {
+                            withholdingTaxLines.add(line);
+                        }
                     }
                 }
             }
+
+            ParsedData result = new ParsedData();
+            result.setDividends(parseDividends(dividendLines));
+            result.setWithholdingTaxes(parseWithholdingTaxes(withholdingTaxLines));
+
+            return result;
+        } catch (Exception e) {
+            return new ParsedData();
         }
-
-        ParsedData result = new ParsedData();
-        result.setDividends(parseDividends(dividendLines));
-        result.setWithholdingTaxes(parseWithholdingTaxes(withholdingTaxLines));
-
-        return result;
     }
 
     private List<DividendData> parseDividends(List<String> lines) {

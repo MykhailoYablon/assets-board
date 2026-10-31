@@ -24,7 +24,7 @@ public class TaxController {
     public TotalTaxReportDto calculateDividendTaxes(@RequestParam("year") short year,
                                                     @RequestParam("file") MultipartFile ibReportFile,
                                                     @RequestParam boolean isMilitary) {
-        return taxService.calculateDividendTax(year, ibReportFile, isMilitary);
+        return taxService.calculateTax(year, ibReportFile, isMilitary);
     }
 
 

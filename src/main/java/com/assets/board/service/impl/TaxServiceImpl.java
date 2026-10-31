@@ -16,8 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -44,21 +42,21 @@ public class TaxServiceImpl implements TaxService {
 
     @Override
     @Transactional
-    public TotalTaxReportDto calculateDividendTax(short year, MultipartFile ibReportFile, boolean isMilitary) {
-        IBFilesParser.ParsedData parsedData = parseIBFile(ibReportFile);
+    public TotalTaxReportDto calculateTax(short year, MultipartFile ibReportFile, boolean isMilitary) {
+        IBFilesParser.ParsedData parsedData = parser.parseIBFile(ibReportFile);
 
         var dividends = Optional.ofNullable(parsedData)
                 .map(IBFilesParser.ParsedData::getDividends)
                 .orElse(Collections.emptyList());
 
-        //withholding Tax is not calculated for now
-        var withholdingTaxes = Optional.ofNullable(parsedData)
-                .map(IBFilesParser.ParsedData::getWithholdingTaxes)
-                .orElse(Collections.emptyList())
-                .stream()
-                .collect(Collectors
-                        .groupingBy(IBFilesParser.WithholdingTaxData::getSymbol,
-                                Collectors.mapping(e -> e, Collectors.toList())));
+//        //withholding Tax is not calculated for now
+//        var withholdingTaxes = Optional.ofNullable(parsedData)
+//                .map(IBFilesParser.ParsedData::getWithholdingTaxes)
+//                .orElse(Collections.emptyList())
+//                .stream()
+//                .collect(Collectors
+//                        .groupingBy(IBFilesParser.WithholdingTaxData::getSymbol,
+//                                Collectors.mapping(e -> e, Collectors.toList())));
 
         // Get unique dates
         Set<LocalDate> uniqueDates = dividends.stream()
@@ -218,17 +216,6 @@ public class TaxServiceImpl implements TaxService {
 //        taxReport.setTotalDividendsNetto(sum(reports, DividendTaxReport::getDividends$Netto));
 
         return taxReport;
-    }
-
-    private IBFilesParser.ParsedData parseIBFile(MultipartFile ibReportFile) {
-        try {
-            try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
-                return parser.parseDividendFile(reader);
-            }
-        } catch (Exception e) {
-            log.info("Error");
-            return null;
-        }
     }
 
     private BigDecimal sum(List<DividendTaxReport> reports,

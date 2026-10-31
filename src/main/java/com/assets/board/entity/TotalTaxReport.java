@@ -50,8 +50,7 @@ public class TotalTaxReport {
     }
 
     public void setTaxReports(List<DividendTaxReport> reports) {
-        // DON'T create new ArrayList - modify the existing one
-            this.taxReports.clear();
+        this.taxReports.clear();
         if (reports != null) {
             reports.forEach(this::addTaxReport);  // Add new ones
         }
