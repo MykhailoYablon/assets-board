@@ -2,7 +2,6 @@ package com.assets.board.service.impl;
 
 import com.assets.board.configuration.TaxpayerProperties;
 import com.assets.board.controller.exception.ResourceNotFoundException;
-import com.assets.board.dto.DividendTaxSummaryDto;
 import com.assets.board.dto.SymbolDividendSummaryDto;
 import com.assets.board.dto.SymbolTradeSummaryDto;
 import com.assets.board.dto.TaxYearSummaryDto;
@@ -114,11 +113,11 @@ public class TaxServiceImpl implements TaxService {
 
   @Override
   @Transactional(readOnly = true)
-  public DividendTaxSummaryDto getDividendSummary(short year) {
+  public TaxYearSummaryDto getTaxYearSummary(short year) {
     TotalTaxReport report = totalTaxReportRepository.findByYear(year)
         .orElseThrow(() -> new ResourceNotFoundException(String.format("No reports found for year %s", year)));
 
-    List<SymbolDividendSummaryDto> bySymbol = report.getDividendTaxReports().stream()
+    List<SymbolDividendSummaryDto> dividendsBySymbol = report.getDividendTaxReports().stream()
         .collect(Collectors.groupingBy(DividendTaxReport::getSymbol))
         .entrySet().stream()
         .map(entry -> {
@@ -139,27 +138,6 @@ public class TaxServiceImpl implements TaxService {
         .sorted(Comparator.comparing(SymbolDividendSummaryDto::getSymbol))
         .toList();
 
-    DividendTaxSummaryDto summary = new DividendTaxSummaryDto();
-    summary.setYear(report.getYear());
-    summary.setTotalAmount(report.getTotalAmount());
-    summary.setTotalUaBrutto(report.getTotalUaBrutto());
-    summary.setTotalTax9(report.getTotalTax());
-    summary.setTotalMilitaryTax5(report.getTotalMilitaryTax5());
-    summary.setTotalTaxSum(report.getTotalTaxSum());
-    summary.setBySymbol(bySymbol);
-    return summary;
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public TaxYearSummaryDto getTaxYearSummary(short year) {
-    TotalTaxReport report = totalTaxReportRepository.findByYear(year)
-        .orElseThrow(() -> new ResourceNotFoundException(String.format("No reports found for year %s", year)));
-
-    // Dividend section — reuse getDividendSummary logic
-    DividendTaxSummaryDto divSummary = getDividendSummary(year);
-
-    // Trade section — group by symbol
     List<SymbolTradeSummaryDto> tradesBySymbol = report.getTradeTaxReports().stream()
         .collect(Collectors.groupingBy(TradeTaxReport::getSymbol))
         .entrySet().stream()
@@ -180,34 +158,25 @@ public class TaxServiceImpl implements TaxService {
         .sorted(Comparator.comparing(SymbolTradeSummaryDto::getSymbol))
         .toList();
 
-    BigDecimal tradeUaBrutto = sumSymbolTrade(tradesBySymbol, SymbolTradeSummaryDto::getTotalUaBrutto);
-    BigDecimal tradeTax      = sumSymbolTrade(tradesBySymbol, SymbolTradeSummaryDto::getTotalTax);
-    BigDecimal tradeMilitary = sumSymbolTrade(tradesBySymbol, SymbolTradeSummaryDto::getTotalMilitary);
-    BigDecimal tradeTaxSum   = sumSymbolTrade(tradesBySymbol, SymbolTradeSummaryDto::getTotalTaxSum);
-
     TaxYearSummaryDto summary = new TaxYearSummaryDto();
     summary.setYear(report.getYear());
-    summary.setDividendAmount(divSummary.getTotalAmount());
-    summary.setDividendUaBrutto(divSummary.getTotalUaBrutto());
-    summary.setDividendTax(divSummary.getTotalTax9());
-    summary.setDividendMilitary(divSummary.getTotalMilitaryTax5());
-    summary.setDividendTaxSum(divSummary.getTotalTaxSum());
-    summary.setTradeUaBrutto(tradeUaBrutto);
-    summary.setTradeTax(tradeTax);
-    summary.setTradeMilitary(tradeMilitary);
-    summary.setTradeTaxSum(tradeTaxSum);
-    summary.setTotalTaxSum(divSummary.getTotalTaxSum().add(tradeTaxSum));
-    summary.setDividendsBySymbol(divSummary.getBySymbol());
+    summary.setDividendAmount(report.getDividendTotalGain());
+    summary.setDividendUaBrutto(report.getDividendTotalUaBrutto());
+    summary.setDividendTax(report.getDividendTotalTax());
+    summary.setDividendMilitary(report.getDividendTotalMilitaryTax5());
+    summary.setDividendTaxSum(report.getDividendTotalTax().add(report.getDividendTotalMilitaryTax5()));
+    summary.setTradeUaBrutto(report.getTradeTotalUaBrutto());
+    summary.setTradeTax(report.getTradeTotalTax());
+    summary.setTradeMilitary(report.getTradeTotalMilitaryTax5());
+    summary.setTradeTaxSum(report.getTradeTotalTax().add(report.getTradeTotalMilitaryTax5()));
+    summary.setTotalTaxSum(report.getTotalTaxSum());
+    summary.setDividendsBySymbol(dividendsBySymbol);
     summary.setTradesBySymbol(tradesBySymbol);
     return summary;
   }
 
   private BigDecimal sumTrade(List<TradeTaxReport> reports, Function<TradeTaxReport, BigDecimal> getter) {
     return reports.stream().map(getter).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-  }
-
-  private BigDecimal sumSymbolTrade(List<SymbolTradeSummaryDto> dtos, Function<SymbolTradeSummaryDto, BigDecimal> getter) {
-    return dtos.stream().map(getter).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
   private @NonNull List<DividendTaxReport> getDividendTaxReports(
@@ -314,24 +283,31 @@ public class TaxServiceImpl implements TaxService {
                                List<DividendTaxReport> dividendTaxReports,
                                List<TradeTaxReport> tradeTaxReports,
                                boolean isMilitary) {
-    taxReport.setTotalAmount(sumDividends(dividendTaxReports, DividendTaxReport::getAmount));
+    // Totals
+    taxReport.setTradeTotalGain(sumTrades(tradeTaxReports, TradeTaxReport::getSellPrice));
+    taxReport.setDividendTotalGain(sumDividends(dividendTaxReports, DividendTaxReport::getAmount));
 
+    // UAH Brutto
     var sumTrades = sumTrades(tradeTaxReports, TradeTaxReport::getUaBrutto);
     var sumDividends = sumDividends(dividendTaxReports, DividendTaxReport::getUaBrutto);
-
     var totalUaBrutto = sumTrades.add(sumDividends);
 
-    taxReport.setTotalUaBrutto(totalUaBrutto);
+    taxReport.setTradeTotalUaBrutto(sumTrades);
+    taxReport.setDividendTotalUaBrutto(sumDividends);
 
     var totalTaxDividends = round(sumDividends.multiply(new BigDecimal("0.09")));
     var totalTaxTrades = round(sumTrades.multiply(new BigDecimal("0.18")));
 
-    var totalTax = totalTaxDividends.add(totalTaxTrades);
-    taxReport.setTotalTax(totalTax);
+
+    taxReport.setTradeTotalTax(totalTaxTrades);
+    taxReport.setDividendTotalTax(totalTaxDividends);
+
+    taxReport.setTradeTotalMilitaryTax5(sumTrades.multiply(new BigDecimal("0.05")));
+    taxReport.setDividendTotalMilitaryTax5(sumDividends.multiply(new BigDecimal("0.05")));
 
     var totalMilitaryTax5 = round(totalUaBrutto.multiply(new BigDecimal("0.05")));
     taxReport.setTotalMilitaryTax5(totalMilitaryTax5);
-
+    var totalTax = totalTaxDividends.add(totalTaxTrades);
     if (isMilitary) {
       taxReport.setTotalTaxSum(totalTax);
     } else {
@@ -404,8 +380,8 @@ public class TaxServiceImpl implements TaxService {
     body.setHtin(taxpayer.getTin());
     body.setHz("1");
     body.setHzy(year);
-    body.setR0104g3(report.getTotalUaBrutto());
-    body.setR0104g6(report.getTotalTax());
+    body.setR0104g3(report.getDividendTotalUaBrutto());
+    body.setR0104g6(report.getDividendTotalTax());
     body.setR0104g7(report.getTotalMilitaryTax5());
     body.setR0108g3(BigDecimal.ZERO);
     body.setR0108g6(BigDecimal.ZERO);

@@ -35,14 +35,29 @@ public class TotalTaxReport {
     @Column(nullable = false)
     private ReportStatus status;
 
-    @Column(name = "total_amount", nullable = false, precision = 19, scale = 2)
-    BigDecimal totalAmount;
+    @Column(name = "trade_total_gain", nullable = false, precision = 19, scale = 2)
+    BigDecimal tradeTotalGain;
 
-    @Column(name = "total_ua_brutto", nullable = false, precision = 19, scale = 2)
-    BigDecimal totalUaBrutto;
+  @Column(name = "dividend_total_gain", nullable = false, precision = 19, scale = 2)
+    BigDecimal dividendTotalGain;
 
-    @Column(name = "total_tax", nullable = false, precision = 19, scale = 2)
-    BigDecimal totalTax;
+    @Column(name = "trade_total_ua_brutto", nullable = false, precision = 19, scale = 2)
+    BigDecimal tradeTotalUaBrutto;
+
+    @Column(name = "dividend_total_ua_brutto", nullable = false, precision = 19, scale = 2)
+    BigDecimal dividendTotalUaBrutto;
+
+    @Column(name = "dividend_total_tax", nullable = false, precision = 19, scale = 2)
+    BigDecimal dividendTotalTax;
+
+    @Column(name = "trade_total_tax", nullable = false, precision = 19, scale = 2)
+    BigDecimal tradeTotalTax;
+
+    @Column(name = "trade_military_tax_5", nullable = false, precision = 19, scale = 2)
+    BigDecimal tradeTotalMilitaryTax5;
+
+    @Column(name = "dividend_military_tax_5", nullable = false, precision = 19, scale = 2)
+    BigDecimal dividendTotalMilitaryTax5;
 
     @Column(name = "total_military_tax_5", nullable = false, precision = 19, scale = 2)
     BigDecimal totalMilitaryTax5;

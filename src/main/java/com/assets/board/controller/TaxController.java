@@ -1,6 +1,5 @@
 package com.assets.board.controller;
 
-import com.assets.board.dto.DividendTaxSummaryDto;
 import com.assets.board.dto.TaxYearSummaryDto;
 import com.assets.board.dto.TotalTaxReportDto;
 import com.assets.board.service.TaxService;
@@ -22,11 +21,6 @@ public class TaxController {
                                                     @RequestParam("file") MultipartFile ibReportFile,
                                                     @RequestParam boolean isMilitary) {
         return taxService.calculateTax(year, ibReportFile, isMilitary);
-    }
-
-    @GetMapping("/dividends/{year}")
-    public DividendTaxSummaryDto getDividendSummary(@PathVariable short year) {
-        return taxService.getDividendSummary(year);
     }
 
     @GetMapping("/summary/{year}")
