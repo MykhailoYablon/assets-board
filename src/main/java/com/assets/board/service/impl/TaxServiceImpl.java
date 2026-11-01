@@ -1,14 +1,26 @@
 package com.assets.board.service.impl;
 
+import com.assets.board.configuration.TaxpayerProperties;
 import com.assets.board.controller.exception.ResourceNotFoundException;
+import com.assets.board.dto.DividendTaxSummaryDto;
+import com.assets.board.dto.SymbolDividendSummaryDto;
 import com.assets.board.dto.TotalTaxReportDto;
 import com.assets.board.entity.DividendTaxReport;
 import com.assets.board.entity.TotalTaxReport;
 import com.assets.board.mapper.TaxReportMapper;
 import com.assets.board.model.enums.ReportStatus;
-import com.assets.board.model.tax.*;
+import com.assets.board.model.tax.Declar;
+import com.assets.board.model.tax.DeclarBody;
+import com.assets.board.model.tax.DeclarBodyF1;
+import com.assets.board.model.tax.DeclarHead;
+import com.assets.board.model.tax.Doc;
+import com.assets.board.model.tax.LinkedDocs;
 import com.assets.board.repository.TotalTaxReportRepository;
-import com.assets.board.service.*;
+import com.assets.board.service.CsvService;
+import com.assets.board.service.ExchangeRateService;
+import com.assets.board.service.IBFilesParser;
+import com.assets.board.service.TaxService;
+import com.assets.board.service.XmlGeneratorService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,8 +31,17 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.*;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -28,345 +49,289 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class TaxServiceImpl implements TaxService {
 
-    private static final int SCALE = 2;
-    private static final RoundingMode ROUNDING_MODE = RoundingMode.HALF_DOWN;
-    private static final String EXPORT_DIR = "exports";
+  private static final int SCALE = 2;
+  private static final RoundingMode ROUNDING_MODE = RoundingMode.HALF_DOWN;
+  private static final String EXPORT_DIR = "exports";
+  private static final DateTimeFormatter FILL_DATE_FORMAT = DateTimeFormatter.ofPattern("ddMMyyyy");
 
-    private final ExchangeRateService exchangeRateService;
-    private final CsvService csvService;
-    private final XmlGeneratorService xmlGeneratorService;
-    private final IBFilesParser parser;
-    private final TotalTaxReportRepository totalTaxReportRepository;
-    private final TaxReportMapper taxReportMapper;
-
-
-    @Override
-    @Transactional
-    public TotalTaxReportDto calculateTax(short year, MultipartFile ibReportFile, boolean isMilitary) {
-        IBFilesParser.ParsedData parsedData = parser.parseIBFile(ibReportFile);
-
-        var dividends = Optional.ofNullable(parsedData)
-                .map(IBFilesParser.ParsedData::getDividends)
-                .orElse(Collections.emptyList());
-
-//        //withholding Tax is not calculated for now
-//        var withholdingTaxes = Optional.ofNullable(parsedData)
-//                .map(IBFilesParser.ParsedData::getWithholdingTaxes)
-//                .orElse(Collections.emptyList())
-//                .stream()
-//                .collect(Collectors
-//                        .groupingBy(IBFilesParser.WithholdingTaxData::getSymbol,
-//                                Collectors.mapping(e -> e, Collectors.toList())));
-
-        // Get unique dates
-        Set<LocalDate> uniqueDates = dividends.stream()
-                .map(IBFilesParser.DividendData::getDate)
-                .collect(Collectors.toSet());
-
-        // Pre-fetch/cache all rates
-        Map<LocalDate, BigDecimal> rateCache = new HashMap<>();
-        for (LocalDate date : uniqueDates) {
-            rateCache.put(date, exchangeRateService.getRateForDate(date));
-        }
-
-        //need to change this
-        //                    var usTaxUSD = amount.multiply(BigDecimal.valueOf(0.15))
-        //                            .setScale(SCALE, ROUNDING_MODE);
-        //                    report.setUsTaxUSD(usTaxUSD);
-        //
-        //                    var usTaxUAH = usTaxUSD.multiply(exchangeRate)
-        //                            .setScale(SCALE, ROUNDING_MODE);
-        //                    report.setUsTaxUAH(usTaxUAH);
-        //
-        //                    BigDecimal totalTaxUAH = taxSum.add(usTaxUAH);
-        //                    report.setTotalTaxUAH(totalTaxUAH);
-        //
-        //                    report.setUsNetto(uaBrutto.subtract(usTaxUAH));
-        //                    report.setUaNetto(uaBrutto.subtract(totalTaxUAH));
-        //
-        //                    //or - 5%
-        //                    report.setDividends$Netto(amount.multiply(BigDecimal.valueOf(0.29)).setScale(SCALE, ROUNDING_MODE));
-
-//        csvService.writeCsvReport(reports, taxReportTotals);
-
-        var reports = dividends.stream()
-                .map(dividend -> {
-                    DividendTaxReport report = new DividendTaxReport();
-
-                    report.setSymbol(dividend.getSymbol());
-                    report.setDate(dividend.getDate());
-                    BigDecimal amount = dividend.getAmount();
-                    report.setAmount(amount);
-
-                    BigDecimal exchangeRate = rateCache.get(dividend.getDate());
-
-                    report.setNbuRate(exchangeRate);
-
-                    var uaBrutto = exchangeRate.multiply(amount)
-                            .setScale(SCALE, ROUNDING_MODE);
-
-                    report.setUaBrutto(uaBrutto);
-
-                    var tax9 = uaBrutto.multiply(BigDecimal.valueOf(0.09))
-                            .setScale(SCALE, ROUNDING_MODE);
-                    var militaryTax5 = uaBrutto.multiply(BigDecimal.valueOf(0.05))
-                            .setScale(SCALE, ROUNDING_MODE);
-
-                    report.setTax9(tax9);
-                    report.setMilitaryTax5(militaryTax5);
-
-                    //if you are in military then don't
-                    BigDecimal taxSum;
-                    if (isMilitary) {
-                        taxSum = tax9;
-                        report.setTaxSum(tax9);
-                    } else {
-                        taxSum = tax9.add(militaryTax5);
-                        report.setTaxSum(taxSum);
-                    }
-
-                    //need to change this
-//                    var usTaxUSD = amount.multiply(BigDecimal.valueOf(0.15))
-//                            .setScale(SCALE, ROUNDING_MODE);
-//                    report.setUsTaxUSD(usTaxUSD);
-//
-//                    var usTaxUAH = usTaxUSD.multiply(exchangeRate)
-//                            .setScale(SCALE, ROUNDING_MODE);
-//                    report.setUsTaxUAH(usTaxUAH);
-//
-//                    BigDecimal totalTaxUAH = taxSum.add(usTaxUAH);
-//                    report.setTotalTaxUAH(totalTaxUAH);
-//
-//                    report.setUsNetto(uaBrutto.subtract(usTaxUAH));
-//                    report.setUaNetto(uaBrutto.subtract(totalTaxUAH));
-//
-//                    //or - 5%
-//                    report.setDividends$Netto(amount.multiply(BigDecimal.valueOf(0.29)).setScale(SCALE, ROUNDING_MODE));
-
-                    return report;
-                })
-                .toList();
-
-        Optional<TotalTaxReport> existingReport = totalTaxReportRepository.findByYear(year);
-
-        TotalTaxReport totalReport;
-
-        if (existingReport.isPresent()) {
-            // Update existing report
-            totalReport = existingReport.get();
-        } else {
-            // Create new report
-            totalReport = new TotalTaxReport();
-            totalReport.setYear(year);
-        }
+  private final ExchangeRateService exchangeRateService;
+  private final CsvService csvService;
+  private final XmlGeneratorService xmlGeneratorService;
+  private final IBFilesParser parser;
+  private final TotalTaxReportRepository totalTaxReportRepository;
+  private final TaxReportMapper taxReportMapper;
+  private final TaxpayerProperties taxpayer;
 
 
-        this.calculateTotals(totalReport, reports);
-        totalReport.setTaxReports(reports);
-        totalReport.setYear(year);
-        totalReport.setStatus(ReportStatus.CALCULATED);
+  @Override
+  @Transactional
+  public TotalTaxReportDto calculateTax(short year, MultipartFile ibReportFile, boolean isMilitary) {
+    IBFilesParser.ParsedData parsedData = parser.parseIBFile(ibReportFile);
 
-        TotalTaxReport report = totalTaxReportRepository.save(totalReport);
+    var dividends = Optional.ofNullable(parsedData)
+        .map(IBFilesParser.ParsedData::getDividends)
+        .orElse(Collections.emptyList());
 
-        return taxReportMapper.toDto(report);
+    Set<LocalDate> uniqueDates = dividends.stream()
+        .map(IBFilesParser.DividendData::getDate)
+        .collect(Collectors.toSet());
+
+    Map<LocalDate, BigDecimal> rateCache = new HashMap<>();
+    for (LocalDate date : uniqueDates) {
+      rateCache.put(date, exchangeRateService.getRateForDate(date));
     }
 
-    @Override
-    @Transactional
-    public void generateUaTaxDeclarationXml(short year) throws Exception {
-        TotalTaxReport existingReport = totalTaxReportRepository.findByYear(year)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(String.format("No reports loaded for this year - %s", year)));
+    var reports = dividends.stream()
+        .map(dividend -> {
+          DividendTaxReport report = new DividendTaxReport();
+          report.setSymbol(dividend.getSymbol());
+          report.setDate(dividend.getDate());
 
-        UUID uuid = UUID.randomUUID();
-        String mainFilename = String.format("F0100214_Zvit_%s.xml", uuid);
-        String f1Filename = String.format("F0121214_DodatokF1_%s.xml", uuid);
+          BigDecimal amount = dividend.getAmount();
+          report.setAmount(amount);
 
-        String mainFilePath = EXPORT_DIR + File.separator + mainFilename;
-        String f1FilePath = EXPORT_DIR + File.separator + f1Filename;
+          BigDecimal exchangeRate = rateCache.get(dividend.getDate());
+          report.setNbuRate(exchangeRate);
 
-        Declar mainDeclar = createDeclar(uuid, existingReport);
-        Declar f1Declar = createDeclarF1(uuid, existingReport);
+          var uaBrutto = exchangeRate.multiply(amount).setScale(SCALE, ROUNDING_MODE);
+          report.setUaBrutto(uaBrutto);
 
-        xmlGeneratorService.saveXmlToFile(mainDeclar, mainFilePath);
-        xmlGeneratorService.saveXmlToFile(f1Declar, f1FilePath);
+          var tax9 = uaBrutto.multiply(BigDecimal.valueOf(0.09)).setScale(SCALE, ROUNDING_MODE);
+          var militaryTax5 = uaBrutto.multiply(BigDecimal.valueOf(0.05)).setScale(SCALE, ROUNDING_MODE);
+          report.setTax9(tax9);
+          report.setMilitaryTax5(militaryTax5);
+
+          if (isMilitary) {
+            report.setTaxSum(tax9);
+          } else {
+            report.setTaxSum(tax9.add(militaryTax5));
+          }
+
+          return report;
+        })
+        .toList();
+
+    TotalTaxReport totalReport = totalTaxReportRepository.findByYear(year)
+        .orElseGet(TotalTaxReport::new);
+    totalReport.setYear(year);
+
+    calculateTotals(totalReport, reports, isMilitary);
+    totalReport.setTaxReports(reports);
+    totalReport.setStatus(ReportStatus.CALCULATED);
+
+    return taxReportMapper.toDto(totalTaxReportRepository.save(totalReport));
+  }
+
+  @Override
+  @Transactional
+  public void generateUaTaxDeclarationXml(short year) throws Exception {
+    TotalTaxReport report = totalTaxReportRepository.findByYear(year)
+        .orElseThrow(() ->
+            new ResourceNotFoundException(String.format("No reports loaded for year %s", year)));
+
+    new File(EXPORT_DIR).mkdirs();
+
+    UUID uuid = UUID.randomUUID();
+    String mainFilePath = EXPORT_DIR + File.separator + String.format("F0100214_Zvit_%s.xml", uuid);
+    String f1FilePath = EXPORT_DIR + File.separator + String.format("F0121214_DodatokF1_%s.xml", uuid);
+
+    xmlGeneratorService.saveXmlToFile(createDeclar(uuid, report), mainFilePath);
+    xmlGeneratorService.saveXmlToFile(createDeclarF1(uuid, report), f1FilePath);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public DividendTaxSummaryDto getDividendSummary(short year) {
+    TotalTaxReport report = totalTaxReportRepository.findByYear(year)
+        .orElseThrow(() -> new ResourceNotFoundException(String.format("No reports found for year %s", year)));
+
+    List<SymbolDividendSummaryDto> bySymbol = report.getTaxReports().stream()
+        .collect(Collectors.groupingBy(DividendTaxReport::getSymbol))
+        .entrySet().stream()
+        .map(entry -> {
+          List<DividendTaxReport> rows = entry.getValue();
+          SymbolDividendSummaryDto dto = new SymbolDividendSummaryDto();
+          dto.setSymbol(entry.getKey());
+          dto.setTotalAmount(sum(rows, DividendTaxReport::getAmount));
+          dto.setTotalUaBrutto(sum(rows, DividendTaxReport::getUaBrutto));
+          dto.setTotalTax9(sum(rows, DividendTaxReport::getTax9));
+          dto.setTotalMilitaryTax5(sum(rows, DividendTaxReport::getMilitaryTax5));
+          dto.setTotalTaxSum(sum(rows, DividendTaxReport::getTaxSum));
+          dto.setPayments(rows.stream()
+              .sorted(Comparator.comparing(DividendTaxReport::getDate))
+              .map(taxReportMapper::toDto)
+              .toList());
+          return dto;
+        })
+        .sorted(Comparator.comparing(SymbolDividendSummaryDto::getSymbol))
+        .toList();
+
+    DividendTaxSummaryDto summary = new DividendTaxSummaryDto();
+    summary.setYear(report.getYear());
+    summary.setTotalAmount(report.getTotalAmount());
+    summary.setTotalUaBrutto(report.getTotalUaBrutto());
+    summary.setTotalTax9(report.getTotalTax9());
+    summary.setTotalMilitaryTax5(report.getTotalMilitaryTax5());
+    summary.setTotalTaxSum(report.getTotalTaxSum());
+    summary.setBySymbol(bySymbol);
+    return summary;
+  }
+
+  private void calculateTotals(TotalTaxReport taxReport, List<DividendTaxReport> reports, boolean isMilitary) {
+    taxReport.setTotalAmount(sum(reports, DividendTaxReport::getAmount));
+
+    var totalUaBrutto = sum(reports, DividendTaxReport::getUaBrutto);
+    taxReport.setTotalUaBrutto(totalUaBrutto);
+
+    var totalTax9 = round(totalUaBrutto.multiply(new BigDecimal("0.09")));
+    taxReport.setTotalTax9(totalTax9);
+
+    var totalMilitaryTax5 = round(totalUaBrutto.multiply(new BigDecimal("0.05")));
+    taxReport.setTotalMilitaryTax5(totalMilitaryTax5);
+
+    if (isMilitary) {
+      taxReport.setTotalTaxSum(totalTax9);
+    } else {
+      taxReport.setTotalTaxSum(round(totalTax9.add(totalMilitaryTax5)));
     }
+  }
 
-    private TotalTaxReport calculateTotals(TotalTaxReport taxReport, List<DividendTaxReport> reports) {
-        // Sum amounts first
-        taxReport.setTotalAmount(sum(reports, DividendTaxReport::getAmount));
-        var totalUaBrutto = sum(reports, DividendTaxReport::getUaBrutto);
-        taxReport.setTotalUaBrutto(totalUaBrutto);
+  private BigDecimal sum(List<DividendTaxReport> reports, Function<DividendTaxReport, BigDecimal> getter) {
+    return reports.stream()
+        .map(getter)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
 
-        // Calculate tax on taxReport (not sum of individual taxes)
-        var totalTax9 = round(totalUaBrutto.multiply(new BigDecimal("0.09")));
-        taxReport.setTotalTax9(totalTax9);
+  private static BigDecimal round(BigDecimal value) {
+    return value.setScale(2, RoundingMode.HALF_UP);
+  }
 
-        var totalMilitaryTax5 = round(totalUaBrutto.multiply(new BigDecimal("0.05")));
-        taxReport.setTotalMilitaryTax5(totalMilitaryTax5);
+  private Declar createDeclar(UUID uuid, TotalTaxReport report) {
+    String year = String.valueOf(report.getYear());
+    String fillDate = LocalDate.now().format(FILL_DATE_FORMAT);
 
-        taxReport.setTotalTaxSum(round(totalTax9.add(totalMilitaryTax5)));
+    DeclarHead head = new DeclarHead();
+    head.setTin(taxpayer.getTin());
+    head.setCDoc("F01");
+    head.setCDocSub("002");
+    head.setCDocVer("11");
+    head.setCDocType("0");
+    head.setCDocCnt("1");
+    head.setCReg(taxpayer.getCReg());
+    head.setCRaj(taxpayer.getCRaj());
+    head.setPeriodMonth("12");
+    head.setPeriodType("5");
+    head.setPeriodYear(year);
+    head.setCStiOrig(taxpayer.getCStiOrig());
+    head.setCDocStan("1");
+    head.setDFill(fillDate);
 
-        // For these, summing individual values makes sense
-//        taxReport.setTotalUsTaxUSD(sum(reports, DividendTaxReport::getUsTaxUSD));
-//        taxReport.setTotalUsTaxUAH(sum(reports, DividendTaxReport::getUsTaxUAH));
-//        taxReport.setTotalTaxUAH(sum(reports, DividendTaxReport::getTotalTaxUAH));
-//        taxReport.setTotalUsNetto(sum(reports, DividendTaxReport::getUsNetto));
-//        taxReport.setTotalUaNetto(sum(reports, DividendTaxReport::getUaNetto));
-//        taxReport.setTotalDividendsNetto(sum(reports, DividendTaxReport::getDividends$Netto));
+    Doc doc = new Doc();
+    doc.setNum("1");
+    doc.setType("1");
+    doc.setCDoc("F01");
+    doc.setCDocSub("212");
+    doc.setCDocVer("11");
+    doc.setCDocType("1");
+    doc.setCDocCnt("1");
+    doc.setCDocStan("1");
+    doc.setFilename("F0121214_DodatokF1_" + uuid + ".xml");
 
-        return taxReport;
-    }
+    LinkedDocs linkedDocs = new LinkedDocs();
+    linkedDocs.setDocs(List.of(doc));
+    head.setLinkedDocs(linkedDocs);
 
-    private BigDecimal sum(List<DividendTaxReport> reports,
-                           Function<DividendTaxReport, BigDecimal> getter) {
-        return reports.stream()
-                .map(getter)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
+    DeclarBody body = new DeclarBody();
+    body.setH01("1");
+    body.setH03("1");
+    body.setH05("1");
+    body.setHbos(taxpayer.getBuilding());
+    body.setHcity(taxpayer.getCity());
+    body.setHd1("1");
+    body.setHfill(fillDate);
+    body.setHname(taxpayer.getName());
+    body.setHsti(taxpayer.getTaxOffice());
+    body.setHstreet(taxpayer.getStreet());
+    body.setHtin(taxpayer.getTin());
+    body.setHz("1");
+    body.setHzy(year);
+    body.setR0104g3(report.getTotalUaBrutto());
+    body.setR0104g6(report.getTotalTax9());
+    body.setR0104g7(report.getTotalMilitaryTax5());
+    body.setR0108g3(BigDecimal.ZERO);
+    body.setR0108g6(BigDecimal.ZERO);
+    body.setR0108g7(BigDecimal.ZERO);
+    body.setR01010g2s("Інші проценти");
+    body.setR010g3(BigDecimal.ZERO);
+    body.setR010g6(BigDecimal.ZERO);
+    body.setR010g7(BigDecimal.ZERO);
+    body.setR012g3(BigDecimal.ZERO);
+    body.setR013g3(BigDecimal.ZERO);
+    body.setR018g3(BigDecimal.ZERO);
+    body.setR0201g3(BigDecimal.ZERO);
+    body.setR0211g3(BigDecimal.ZERO);
 
-    private static BigDecimal round(BigDecimal value) {
-        return value.setScale(2, RoundingMode.HALF_UP);
-    }
+    Declar declar = new Declar();
+    declar.setDeclarHead(head);
+    declar.setDeclarBody(body);
+    return declar;
+  }
 
-    private Declar createDeclar(UUID uuid, TotalTaxReport existingReport) {
-        Declar declar = new Declar();
+  private Declar createDeclarF1(UUID uuid, TotalTaxReport report) {
+    String year = String.valueOf(report.getYear());
+    String fillDate = LocalDate.now().format(FILL_DATE_FORMAT);
 
-        DeclarHead head = new DeclarHead();
-        head.setTin("");
-        head.setCDoc("F01");
-        head.setCDocSub("002");
-        head.setCDocVer("11");
-        head.setCDocType("0");
-        head.setCDocCnt("1");
-        head.setCReg("0");
-        head.setCRaj("15");
-        head.setPeriodMonth("12");
-        head.setPeriodType("5");
-        head.setPeriodYear("2025");
-        head.setCStiOrig("915");
-        head.setCDocStan("1");
+    DeclarHead head = new DeclarHead();
+    head.setTin(taxpayer.getTin());
+    head.setCDoc("F01");
+    head.setCDocSub("212");
+    head.setCDocVer("11");
+    head.setCDocType("1");
+    head.setCDocCnt("1");
+    head.setCReg(taxpayer.getCReg());
+    head.setCRaj(taxpayer.getCRaj());
+    head.setPeriodMonth("12");
+    head.setPeriodType("5");
+    head.setPeriodYear(year);
+    head.setCStiOrig(taxpayer.getCStiOrig());
+    head.setCDocStan("1");
+    head.setDFill(fillDate);
 
-        //date of generation
-        head.setDFill("16012026");
-//        head.setSoftware("https://ua-tax.web.app/ 1.7.0");
+    Doc doc = new Doc();
+    doc.setNum("1");
+    doc.setType("2");
+    doc.setCDoc("F01");
+    doc.setCDocSub("002");
+    doc.setCDocVer("11");
+    doc.setCDocType("0");
+    doc.setCDocCnt("1");
+    doc.setCDocStan("1");
+    doc.setFilename("F0100214_Zvit_" + uuid + ".xml");
 
-        // Create linked docs
-        Doc doc = new Doc();
-        doc.setNum("1");
-        doc.setType("1");
-        doc.setCDoc("F01");
-        doc.setCDocSub("212");
-        doc.setCDocVer("11");
-        doc.setCDocType("1");
-        doc.setCDocCnt("1");
-        doc.setCDocStan("1");
+    LinkedDocs linkedDocs = new LinkedDocs();
+    linkedDocs.setDocs(List.of(doc));
+    head.setLinkedDocs(linkedDocs);
 
-        doc.setFilename("F0121214_DodatokF1_" + uuid + ".xml");
+    // F1 appendix is for capital gains (investment income from stock sales).
+    // Capital gains calculation is not yet implemented — all fields are zero.
+    DeclarBodyF1 body = new DeclarBodyF1();
+    body.setHbos(taxpayer.getName());
+    body.setHtin(taxpayer.getTin());
+    body.setHz("1");
+    body.setHzy(year);
+    body.setR001g4("0");
+    body.setR001g5("0");
+    body.setR001g6("0");
+    body.setR003g6("0");
+    body.setR004g6("0");
+    body.setR005g6("0");
+    body.setR031g6("0");
+    body.setR042g6("0");
+    body.setR052g6("0");
 
-        LinkedDocs linkedDocs = new LinkedDocs();
-        linkedDocs.setDocs(Arrays.asList(doc));
-
-        head.setLinkedDocs(linkedDocs);
-        declar.setDeclarHead(head);
-
-        // DECLARBODY
-        DeclarBody body = new DeclarBody();
-        body.setH01("1");
-        body.setH03("1");
-        body.setH05("1");
-        body.setHbos("Test");
-        body.setHcity("Test");
-        body.setHd1("1");
-        body.setHfill("16012026");
-        body.setHname("Test Test");
-        body.setHsti("ДПС");
-        body.setHstreet("Stree");
-        body.setHtin("");
-        body.setHz("1");
-        body.setHzy("2025");
-        body.setR0104g3(BigDecimal.valueOf(2323.86));
-        body.setR0104g6(BigDecimal.valueOf(209.15));
-        body.setR0104g7(BigDecimal.ZERO);
-        body.setR0108g3(BigDecimal.ZERO);
-        body.setR0108g6(BigDecimal.ZERO);
-        body.setR0108g7(BigDecimal.ZERO);
-        body.setR01010g2s("Інші проценти");
-        body.setR010g3(BigDecimal.ZERO);
-        body.setR010g6(BigDecimal.ZERO);
-        body.setR010g7(BigDecimal.ZERO);
-        body.setR012g3(BigDecimal.ZERO);
-        body.setR013g3(BigDecimal.ZERO);
-        body.setR018g3(BigDecimal.ZERO);
-        body.setR0201g3(BigDecimal.ZERO);
-        body.setR0211g3(BigDecimal.ZERO);
-
-        declar.setDeclarBody(body);
-
-        return declar;
-    }
-
-    private Declar createDeclarF1(UUID uuid, TotalTaxReport existingReport) {
-        Declar declar = new Declar();
-
-        // DECLARHEAD
-        DeclarHead head = new DeclarHead();
-        head.setTin("");
-        head.setCDoc("F01");
-        head.setCDocSub("212");
-        head.setCDocVer("11");
-        head.setCDocType("1");
-        head.setCDocCnt("1");
-        head.setCReg("0");
-        head.setCRaj("15");
-        head.setPeriodMonth("12");
-        head.setPeriodType("5");
-        head.setPeriodYear("2025");
-        head.setCStiOrig("915");
-        head.setCDocStan("1");
-        head.setDFill("16012026");
-
-        // Create linked docs
-        Doc doc = new Doc();
-        doc.setNum("1");
-        doc.setType("2");
-        doc.setCDoc("F01");
-        doc.setCDocSub("002");
-        doc.setCDocVer("11");
-        doc.setCDocType("0");
-        doc.setCDocCnt("1");
-        doc.setCDocStan("1");
-        doc.setFilename("F0100214_Zvit_" + uuid + ".xml");
-
-        LinkedDocs linkedDocs = new LinkedDocs();
-        linkedDocs.setDocs(Arrays.asList(doc));
-        head.setLinkedDocs(linkedDocs);
-
-        declar.setDeclarHead(head);
-
-        // DECLARBODY F1
-        DeclarBodyF1 body = new DeclarBodyF1();
-        body.setHbos("Test Test");
-        body.setHtin("");
-        body.setHz("1");
-        body.setHzy("2025");
-        body.setR001g4("32130.56");
-        body.setR001g5("31196.75");
-        body.setR001g6("933.81");
-        body.setR003g6("933.81");
-        body.setR004g6("168.09");
-        body.setR005g6("46.69");
-        body.setR031g6("933.81");
-        body.setR042g6("168.09");
-        body.setR052g6("46.69");
-
-        // Add table rows
-        body.addTableRow("1", "4", "GOOGL 1шт.", "6903.66", "6259.61", "644.05");
-        body.addTableRow("2", "4", "CRM 1шт.", "11047.23", "11016.3", "30.93");
-        body.addTableRow("3", "4", "VTI 1шт.", "14179.67", "13920.84", "258.83");
-
-        declar.setDeclarBody(body);
-
-        return declar;
-    }
+    Declar declar = new Declar();
+    declar.setDeclarHead(head);
+    declar.setDeclarBody(body);
+    return declar;
+  }
 }

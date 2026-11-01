@@ -1,25 +1,22 @@
 package com.assets.board.model.ib;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.opencsv.bean.CsvBindByPosition;
+import com.opencsv.bean.CsvBindByName;
 import lombok.Data;
-import lombok.Setter;
 
 import java.math.BigDecimal;
 
-@Setter
 @Data
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class DividendRecord {
 
-    @CsvBindByPosition(position = 3)
-    private String date;
+    @CsvBindByName(column = "Date/Time")
+    private String dateTime;
 
-    @CsvBindByPosition(position = 4)
-    private String description;
+    @CsvBindByName(column = "Symbol")
+    private String symbol;
 
-    @CsvBindByPosition(position = 5)
+    @CsvBindByName(column = "Amount")
     private BigDecimal amount;
 
-//    USTaxUSD,USTaxUAH,TotalTaxUAH,USNetto,UANetto,Dividends$Netto
+    @CsvBindByName(column = "Type")
+    private String type;
 }

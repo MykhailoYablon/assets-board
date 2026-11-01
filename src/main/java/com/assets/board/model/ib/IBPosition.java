@@ -15,7 +15,7 @@ public class IBPosition {
     private String description;
 
     @CsvBindByName(column = "Quantity")
-    private Integer quantity;
+    private Double quantity;
 
     @CsvBindByName(column = "MarkPrice")
     private Double markPrice;

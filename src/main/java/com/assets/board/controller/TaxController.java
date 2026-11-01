@@ -1,11 +1,9 @@
 package com.assets.board.controller;
 
+import com.assets.board.dto.DividendTaxSummaryDto;
 import com.assets.board.dto.TotalTaxReportDto;
 import com.assets.board.service.TaxService;
-import com.assets.board.service.XmlGeneratorService;
 import lombok.AllArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,9 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 @AllArgsConstructor
 public class TaxController {
 
-
     private final TaxService taxService;
-    private final XmlGeneratorService xmlGeneratorService;
 
     @PostMapping("/dividends")
     public TotalTaxReportDto calculateDividendTaxes(@RequestParam("year") short year,
@@ -27,19 +23,14 @@ public class TaxController {
         return taxService.calculateTax(year, ibReportFile, isMilitary);
     }
 
+    @GetMapping("/dividends/{year}")
+    public DividendTaxSummaryDto getDividendSummary(@PathVariable short year) {
+        return taxService.getDividendSummary(year);
+    }
 
-    @GetMapping("/generate")
-    public ResponseEntity<String> generateXml(@RequestParam("year") short year) throws Exception {
-
-//        taxService.generateUaTaxDeclarationXml();
-
-//        String xml = xmlGeneratorService.generateDeclarXml(declar);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_XML);
-
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body("OK");
+    @PostMapping("/generate")
+    public ResponseEntity<Void> generateXml(@RequestParam("year") short year) throws Exception {
+        taxService.generateUaTaxDeclarationXml(year);
+        return ResponseEntity.ok().build();
     }
 }

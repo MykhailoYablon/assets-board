@@ -1,48 +1,36 @@
 package com.assets.board.client;
 
 import com.assets.board.model.NbuExchangeRate;
-import com.assets.board.service.ExchangeRateService;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Primary;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
 import static com.assets.board.model.enums.Endpoint.NBU_EXCHANGE;
 
-@NoArgsConstructor
-@Getter
-@Setter
 @Slf4j
-@Component("NbuData")
-@Qualifier("NbuData")
-@Primary
+@Component
 public class NbuDataClient {
 
-    @Autowired
-    @Qualifier("nbuClient")
-    private RestClient nbuClient;
+    private final RestClient nbuClient;
+
+    public NbuDataClient(@Qualifier("nbuClient") RestClient nbuClient) {
+        this.nbuClient = nbuClient;
+    }
 
     public BigDecimal exchangeRate(LocalDate date) {
-        var requestDate = date.toString().replaceAll("-", "");
+        String requestDate = date.format(DateTimeFormatter.BASIC_ISO_DATE);
         List<NbuExchangeRate> rate = nbuClient.get()
-                .uri(NBU_EXCHANGE.url() + "?json"
-                        + "&valcode=" + "USD"
-                        + "&date=" + requestDate
-                )
+                .uri(NBU_EXCHANGE.url() + "?json&valcode=USD&date=" + requestDate)
                 .retrieve()
-                .body(new ParameterizedTypeReference<>() {
-                });
+                .body(new ParameterizedTypeReference<>() {});
         return Optional.ofNullable(rate)
                 .map(List::getFirst)
                 .map(NbuExchangeRate::getRate)

@@ -1,31 +1,18 @@
 spring:
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://127.0.0.1:5433/mydatabase}
-    username: ${DATABASE_USERNAME:myuser}
-    password: ${DATABASE_PASSWORD:mysecretpassword}
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:sqlite:assets-board.db
+    driver-class-name: org.sqlite.JDBC
     hikari:
-      connection-init-sql: SET TIME ZONE 'Europe/Kyiv'
-#  # Redis config
-#  data:
-#    redis:
-#      host: 127.0.0.1
-#      port: 6379
-#      password:
-#      timeout: 60000
+      maximum-pool-size: 1
 
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
   properties:
     hibernate:
       format_sql: true
-      jdbc:
-        time_zone: Europe/Kyiv
-        lob:
-          non_contextual_creation: true
 #Financial websocket
 financial:
   twelve:
@@ -49,4 +36,15 @@ server:
 
 redis:
   default-retention: 3600000
+
+taxpayer:
+  tin: ${TAXPAYER_TIN:}
+  name: ${TAXPAYER_NAME:}
+  city: ${TAXPAYER_CITY:}
+  street: ${TAXPAYER_STREET:}
+  building: ${TAXPAYER_BUILDING:1}
+  c-reg: ${TAXPAYER_C_REG:0}
+  c-raj: ${TAXPAYER_C_RAJ:0}
+  c-sti-orig: ${TAXPAYER_C_STI_ORIG:0}
+  tax-office: ${TAXPAYER_TAX_OFFICE:ДПС}
 

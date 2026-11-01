@@ -2,7 +2,7 @@ package com.assets.board.service;
 
 import com.assets.board.model.ib.DividendRecord;
 import com.assets.board.model.ib.IBPosition;
-import com.assets.board.model.ib.WithholdingTaxRecord;
+import com.assets.board.model.ib.TradeRecord;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import lombok.Data;
@@ -16,24 +16,34 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class IBFilesParser {
 
-    private static final Pattern SYMBOL_PATTERN = Pattern.compile("^([A-Z]+)(?=\\()");
+    private static final DateTimeFormatter IB_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     @Data
     public static class DividendData {
         private String symbol;
         private LocalDate date;
         private BigDecimal amount;
+    }
+
+    @Data
+    public static class TradeData {
+        private String symbol;
+        private LocalDate date;
+        private BigDecimal quantity;
+        private BigDecimal price;
+        private BigDecimal netCash;
+        private String side;
+        private String currency;
+        private BigDecimal pnl;
     }
 
     @Data
@@ -46,126 +56,116 @@ public class IBFilesParser {
     @Data
     public static class ParsedData {
         private List<DividendData> dividends = new ArrayList<>();
+        private List<TradeData> trades = new ArrayList<>();
         private List<WithholdingTaxData> withholdingTaxes = new ArrayList<>();
     }
 
-    public List<IBPosition> parseIBPositions(MultipartFile ibReportFile) {
-        try {
-            try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
-
-                CsvToBean<IBPosition> csvToBean = new CsvToBeanBuilder<IBPosition>(reader)
-                        .withType(IBPosition.class)
-                        .withIgnoreLeadingWhiteSpace(true)
-                        .build();
-
-                return csvToBean.parse();
-            }
-        } catch (Exception e) {
-            log.info("Error");
-            return Collections.emptyList();
-        }
-    }
-
+    /**
+     * Parses the IB "Dividends and Trades" CSV export.
+     *
+     * The file contains two back-to-back sections with different headers:
+     *   - Trades:    first column = "TradeDate"
+     *   - Dividends: first column = "Date/Time"
+     */
     public ParsedData parseIBFile(MultipartFile ibReportFile) {
-        try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
-            BufferedReader bufferedReader = new BufferedReader(reader);
-
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(ibReportFile.getInputStream()))) {
+            List<String> tradeLines = new ArrayList<>();
             List<String> dividendLines = new ArrayList<>();
-            List<String> withholdingTaxLines = new ArrayList<>();
-
-            String line;
             String currentSection = null;
+            String line;
 
-            while ((line = bufferedReader.readLine()) != null) {
-                String[] parts = line.split(",", 2);
+            while ((line = reader.readLine()) != null) {
+                if (line.isBlank()) continue;
 
-                if (parts.length > 0) {
-                    String firstColumn = parts[0].trim();
-
-                    // Check if this is a header line
-                    if (line.contains(",Header,")) {
-                        currentSection = firstColumn;
-                    }
-                    // Check if this is a data line
-                    else if (line.contains(",Data,")) {
-                        if ("Dividends".equals(currentSection)) {
-                            dividendLines.add(line);
-                        } else if ("Withholding Tax".equals(currentSection)) {
-                            withholdingTaxLines.add(line);
-                        }
-                    }
+                if (line.startsWith("\"TradeDate\"")) {
+                    currentSection = "TRADES";
+                    tradeLines.add(line);
+                } else if (line.startsWith("\"Date/Time\"")) {
+                    currentSection = "DIVIDENDS";
+                    dividendLines.add(line);
+                } else if ("TRADES".equals(currentSection)) {
+                    tradeLines.add(line);
+                } else if ("DIVIDENDS".equals(currentSection)) {
+                    dividendLines.add(line);
                 }
             }
 
             ParsedData result = new ParsedData();
             result.setDividends(parseDividends(dividendLines));
-            result.setWithholdingTaxes(parseWithholdingTaxes(withholdingTaxLines));
-
+            result.setTrades(parseTrades(tradeLines));
             return result;
         } catch (Exception e) {
+            log.error("Failed to parse IB file", e);
             return new ParsedData();
         }
     }
 
-    private List<DividendData> parseDividends(List<String> lines) {
-        if (lines.isEmpty()) {
-            return new ArrayList<>();
+    public List<IBPosition> parseIBPositions(MultipartFile ibReportFile) {
+        try {
+            try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
+                CsvToBean<IBPosition> csvToBean = new CsvToBeanBuilder<IBPosition>(reader)
+                        .withType(IBPosition.class)
+                        .withIgnoreLeadingWhiteSpace(true)
+                        .build();
+                return csvToBean.parse();
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse IB positions file", e);
+            return Collections.emptyList();
         }
+    }
 
-        String csv = String.join("\n", lines);
+    private List<DividendData> parseDividends(List<String> lines) {
+        if (lines.size() <= 1) return new ArrayList<>();
 
-        try (StringReader stringReader = new StringReader(csv)) {
-            CsvToBean<DividendRecord> csvToBean = new CsvToBeanBuilder<DividendRecord>(stringReader)
+        try (StringReader reader = new StringReader(String.join("\n", lines))) {
+            CsvToBean<DividendRecord> csvToBean = new CsvToBeanBuilder<DividendRecord>(reader)
                     .withType(DividendRecord.class)
                     .withIgnoreLeadingWhiteSpace(true)
                     .build();
 
             return csvToBean.parse().stream()
-                    .filter(r -> !r.getDate().isBlank())
+                    .filter(r -> "Dividends".equals(r.getType()))
                     .map(r -> {
                         DividendData d = new DividendData();
-                        d.setSymbol(extractSymbol(r.getDescription()));
-                        d.setDate(LocalDate.parse(r.getDate()));
+                        d.setSymbol(r.getSymbol());
+                        // Date/Time column format: "yyyyMMdd;HHmmss"
+                        d.setDate(LocalDate.parse(r.getDateTime().split(";")[0], IB_DATE));
                         d.setAmount(r.getAmount());
                         return d;
                     })
-                    .collect(Collectors.toList());
+                    .toList();
         } catch (Exception e) {
             throw new RuntimeException("Error parsing dividends", e);
         }
     }
 
-    private List<WithholdingTaxData> parseWithholdingTaxes(List<String> lines) {
-        if (lines.isEmpty()) {
-            return new ArrayList<>();
-        }
+    private List<TradeData> parseTrades(List<String> lines) {
+        if (lines.size() <= 1) return new ArrayList<>();
 
-        String csv = String.join("\n", lines);
-
-        try (StringReader stringReader = new StringReader(csv)) {
-            CsvToBean<WithholdingTaxRecord> csvToBean = new CsvToBeanBuilder<WithholdingTaxRecord>(stringReader)
-                    .withType(WithholdingTaxRecord.class)
+        try (StringReader reader = new StringReader(String.join("\n", lines))) {
+            CsvToBean<TradeRecord> csvToBean = new CsvToBeanBuilder<TradeRecord>(reader)
+                    .withType(TradeRecord.class)
                     .withIgnoreLeadingWhiteSpace(true)
                     .build();
 
             return csvToBean.parse().stream()
-                    .filter(r -> !r.getDate().isBlank())
+                    .filter(r -> "STK".equals(r.getAssetClass()))
                     .map(r -> {
-                        WithholdingTaxData w = new WithholdingTaxData();
-                        w.setSymbol(extractSymbol(r.getDescription()));
-                        w.setDate(LocalDate.parse(r.getDate()));
-                        w.setAmount(r.getAmount());
-                        return w;
+                        TradeData t = new TradeData();
+                        t.setSymbol(r.getSymbol());
+                        t.setDate(LocalDate.parse(r.getTradeDate(), IB_DATE));
+                        t.setQuantity(r.getQuantity());
+                        t.setPrice(r.getTradePrice());
+                        t.setNetCash(r.getNetCash());
+                        t.setSide(r.getSide());
+                        t.setCurrency(r.getCurrency());
+                        t.setPnl(r.getPnl());
+                        return t;
                     })
-                    .collect(Collectors.toList());
+                    .toList();
         } catch (Exception e) {
-            throw new RuntimeException("Error parsing withholding taxes", e);
+            throw new RuntimeException("Error parsing trades", e);
         }
-    }
-
-    private String extractSymbol(String description) {
-        if (description == null) return null;
-        Matcher matcher = SYMBOL_PATTERN.matcher(description);
-        return matcher.find() ? matcher.group(1) : null;
     }
 }

@@ -4,6 +4,7 @@ import com.assets.board.model.tax.Declar;
 import com.assets.board.model.tax.DeclarBody;
 import com.assets.board.model.tax.DeclarBodyF1;
 import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import org.springframework.stereotype.Service;
 
@@ -14,33 +15,32 @@ import java.io.StringWriter;
 public class XmlGeneratorService {
 
     private static final String ENCODING = "windows-1251";
+    private static final JAXBContext JAXB_CONTEXT;
+
+    static {
+        try {
+            JAXB_CONTEXT = JAXBContext.newInstance(Declar.class, DeclarBody.class, DeclarBodyF1.class);
+        } catch (JAXBException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
 
     public String generateDeclarXml(Declar declar) throws Exception {
-        JAXBContext context = JAXBContext.newInstance(Declar.class);
-        Marshaller marshaller = context.createMarshaller();
-
-        // Configure marshaller
-        marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
-        marshaller.setProperty(Marshaller.JAXB_ENCODING, ENCODING);
-        marshaller.setProperty(Marshaller.JAXB_FRAGMENT, false);
-
+        Marshaller marshaller = createMarshaller();
         StringWriter writer = new StringWriter();
         marshaller.marshal(declar, writer);
-
         return writer.toString();
     }
 
     public void saveXmlToFile(Declar declar, String filepath) throws Exception {
-        JAXBContext context = JAXBContext.newInstance(Declar.class, DeclarBody.class, DeclarBodyF1.class);
-        Marshaller marshaller = context.createMarshaller();
+        createMarshaller().marshal(declar, new File(filepath));
+    }
 
-        // Configure marshaller
+    private Marshaller createMarshaller() throws JAXBException {
+        Marshaller marshaller = JAXB_CONTEXT.createMarshaller();
         marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
         marshaller.setProperty(Marshaller.JAXB_ENCODING, ENCODING);
         marshaller.setProperty(Marshaller.JAXB_FRAGMENT, false);
-
-
-        File file = new File(filepath);
-        marshaller.marshal(declar, file);
+        return marshaller;
     }
 }
