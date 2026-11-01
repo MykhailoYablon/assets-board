@@ -1,6 +1,7 @@
 package com.assets.board.controller;
 
 import com.assets.board.dto.DividendTaxSummaryDto;
+import com.assets.board.dto.TaxYearSummaryDto;
 import com.assets.board.dto.TotalTaxReportDto;
 import com.assets.board.service.TaxService;
 import lombok.AllArgsConstructor;
@@ -26,6 +27,11 @@ public class TaxController {
     @GetMapping("/dividends/{year}")
     public DividendTaxSummaryDto getDividendSummary(@PathVariable short year) {
         return taxService.getDividendSummary(year);
+    }
+
+    @GetMapping("/summary/{year}")
+    public TaxYearSummaryDto getTaxYearSummary(@PathVariable short year) {
+        return taxService.getTaxYearSummary(year);
     }
 
     @PostMapping("/generate")

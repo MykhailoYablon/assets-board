@@ -14,7 +14,8 @@ public class TotalTaxReportDto {
     BigDecimal totalTax9;
     BigDecimal totalMilitaryTax5;
     BigDecimal totalTaxSum;
-    List<DividendTaxReportDto> taxReportDtos;
+    List<DividendTaxReportDto> dividendTaxReportDtos;
+    List<TradeTaxReportDto> tradeTaxReportDtos;
 
 //    BigDecimal totalUsTaxUSD;
 //    BigDecimal totalUsTaxUAH;

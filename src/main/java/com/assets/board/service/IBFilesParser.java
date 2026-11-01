@@ -37,12 +37,16 @@ public class IBFilesParser {
     @Data
     public static class TradeData {
         private String symbol;
-        private LocalDate date;
-        private BigDecimal quantity;
-        private BigDecimal price;
-        private BigDecimal netCash;
-        private String side;
+        private String description;
         private String currency;
+        private String side;
+        private LocalDate tradeDate;
+        private LocalDate openDate;
+        private BigDecimal quantity;
+        private BigDecimal tradePrice;
+        private BigDecimal fifoPnlRealized;
+        private BigDecimal proceeds;
+        private BigDecimal ibCommission;
         private BigDecimal pnl;
     }
 
@@ -61,11 +65,8 @@ public class IBFilesParser {
     }
 
     /**
-     * Parses the IB "Dividends and Trades" CSV export.
-     *
-     * The file contains two back-to-back sections with different headers:
-     *   - Trades:    first column = "TradeDate"
-     *   - Dividends: first column = "Date/Time"
+     * All section headers start with "ClientAccountID". Sections are identified by
+     * unique column names: trades contain "TradeDate", dividends contain "DividendType".
      */
     public ParsedData parseIBFile(MultipartFile ibReportFile) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(ibReportFile.getInputStream()))) {
@@ -77,12 +78,16 @@ public class IBFilesParser {
             while ((line = reader.readLine()) != null) {
                 if (line.isBlank()) continue;
 
-                if (line.startsWith("\"TradeDate\"")) {
-                    currentSection = "TRADES";
-                    tradeLines.add(line);
-                } else if (line.startsWith("\"Date/Time\"")) {
-                    currentSection = "DIVIDENDS";
-                    dividendLines.add(line);
+                if (line.startsWith("\"ClientAccountID\"")) {
+                    if (line.contains("\"TradeDate\"")) {
+                        currentSection = "TRADES";
+                        tradeLines.add(line);
+                    } else if (line.contains("\"DividendType\"")) {
+                        currentSection = "DIVIDENDS";
+                        dividendLines.add(line);
+                    } else {
+                        currentSection = null;
+                    }
                 } else if ("TRADES".equals(currentSection)) {
                     tradeLines.add(line);
                 } else if ("DIVIDENDS".equals(currentSection)) {
@@ -101,14 +106,12 @@ public class IBFilesParser {
     }
 
     public List<IBPosition> parseIBPositions(MultipartFile ibReportFile) {
-        try {
-            try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
-                CsvToBean<IBPosition> csvToBean = new CsvToBeanBuilder<IBPosition>(reader)
-                        .withType(IBPosition.class)
-                        .withIgnoreLeadingWhiteSpace(true)
-                        .build();
-                return csvToBean.parse();
-            }
+        try (Reader reader = new InputStreamReader(ibReportFile.getInputStream())) {
+            CsvToBean<IBPosition> csvToBean = new CsvToBeanBuilder<IBPosition>(reader)
+                    .withType(IBPosition.class)
+                    .withIgnoreLeadingWhiteSpace(true)
+                    .build();
+            return csvToBean.parse();
         } catch (Exception e) {
             log.error("Failed to parse IB positions file", e);
             return Collections.emptyList();
@@ -129,7 +132,6 @@ public class IBFilesParser {
                     .map(r -> {
                         DividendData d = new DividendData();
                         d.setSymbol(r.getSymbol());
-                        // Date/Time column format: "yyyyMMdd;HHmmss"
                         d.setDate(LocalDate.parse(r.getDateTime().split(";")[0], IB_DATE));
                         d.setAmount(r.getAmount());
                         return d;
@@ -151,16 +153,32 @@ public class IBFilesParser {
 
             return csvToBean.parse().stream()
                     .filter(r -> "STK".equals(r.getAssetClass()))
+                    .filter(r -> "SELL".equals(r.getSide()))
+                    .filter(r -> "CLOSED_LOT".equals(r.getLevelOfDetail()))
                     .map(r -> {
                         TradeData t = new TradeData();
                         t.setSymbol(r.getSymbol());
-                        t.setDate(LocalDate.parse(r.getTradeDate(), IB_DATE));
-                        t.setQuantity(r.getQuantity());
-                        t.setPrice(r.getTradePrice());
-                        t.setNetCash(r.getNetCash());
-                        t.setSide(r.getSide());
+                        t.setDescription(r.getDescription());
                         t.setCurrency(r.getCurrency());
-                        t.setPnl(r.getPnl());
+                        t.setSide(r.getSide());
+                        t.setTradeDate(LocalDate.parse(r.getTradeDate(), IB_DATE));
+
+                        if (r.getOpenDateTime() != null && !r.getOpenDateTime().isBlank()) {
+                            t.setOpenDate(LocalDate.parse(r.getOpenDateTime().split(";")[0], IB_DATE));
+                        }
+
+                        t.setQuantity(r.getQuantity().abs());
+                        t.setTradePrice(r.getTradePrice());
+                        t.setFifoPnlRealized(r.getFifoPnlRealized());
+
+                        // Proceeds is empty in CLOSED_LOT records — derive from price × qty
+                        if (r.getProceeds() != null && r.getProceeds().compareTo(BigDecimal.ZERO) != 0) {
+                            t.setProceeds(r.getProceeds().abs());
+                        } else {
+                            t.setProceeds(r.getFifoPnlRealized().multiply(r.getQuantity().abs()));
+                        }
+
+                        t.setIbCommission(r.getIbCommission() != null ? r.getIbCommission().abs() : BigDecimal.ZERO);
                         return t;
                     })
                     .toList();

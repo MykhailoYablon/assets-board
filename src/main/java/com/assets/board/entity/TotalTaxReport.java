@@ -2,7 +2,17 @@ package com.assets.board.entity;
 
 import com.assets.board.model.enums.ReportStatus;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -31,8 +41,8 @@ public class TotalTaxReport {
     @Column(name = "total_ua_brutto", nullable = false, precision = 19, scale = 2)
     BigDecimal totalUaBrutto;
 
-    @Column(name = "total_tax_9", nullable = false, precision = 19, scale = 2)
-    BigDecimal totalTax9;
+    @Column(name = "total_tax", nullable = false, precision = 19, scale = 2)
+    BigDecimal totalTax;
 
     @Column(name = "total_military_tax_5", nullable = false, precision = 19, scale = 2)
     BigDecimal totalMilitaryTax5;
@@ -42,22 +52,36 @@ public class TotalTaxReport {
 
     @OneToMany(mappedBy = "totalTaxReport", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @JsonManagedReference
-    List<DividendTaxReport> taxReports = new ArrayList<>();
+    List<DividendTaxReport> dividendTaxReports = new ArrayList<>();
 
-    public void addTaxReport(DividendTaxReport report) {
-        taxReports.add(report);
-        report.setTotalTaxReport(this);
+    @OneToMany(mappedBy = "totalTaxReport", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonManagedReference
+    List<TradeTaxReport> tradeTaxReports = new ArrayList<>();
+
+  public void setTaxReports(List<DividendTaxReport> dividendTaxReports, List<TradeTaxReport>  tradeTaxReports) {
+    this.dividendTaxReports.clear();
+    this.tradeTaxReports.clear();
+    if (dividendTaxReports != null) {
+      dividendTaxReports.forEach(this::addDividendTaxReport);  // Add new ones
+    }
+    if (tradeTaxReports != null) {
+      tradeTaxReports.forEach(this::addTradeTaxReport);
+    }
+  }
+
+    public void addDividendTaxReport(DividendTaxReport report) {
+      dividendTaxReports.add(report);
+      report.setTotalTaxReport(this);
     }
 
-    public void setTaxReports(List<DividendTaxReport> reports) {
-        this.taxReports.clear();
-        if (reports != null) {
-            reports.forEach(this::addTaxReport);  // Add new ones
-        }
+    public void addTradeTaxReport(TradeTaxReport report) {
+      tradeTaxReports.add(report);
+      report.setTotalTaxReport(this);
     }
 
     // Add this method for clearing
     public void clearTaxReports() {
-        this.taxReports.clear();
+      this.dividendTaxReports.clear();
+      this.tradeTaxReports.clear();
     }
 }
