@@ -7,7 +7,8 @@ import com.assets.board.dto.TaxDeclarationFormDto;
 import com.assets.board.dto.TaxOfficeOptionDto;
 import com.assets.board.dto.TaxYearSummaryDto;
 import com.assets.board.dto.TotalTaxReportDto;
-import com.assets.board.model.UkrainianTaxOffice;
+import com.assets.board.model.TaxOfficeEntry;
+import com.assets.board.model.TaxOfficeRegistry;
 import com.assets.board.entity.DividendTaxReport;
 import com.assets.board.entity.TotalTaxReport;
 import com.assets.board.entity.TradeTaxReport;
@@ -65,6 +66,7 @@ public class TaxServiceImpl implements TaxService {
   private final IBFilesParser parser;
   private final TotalTaxReportRepository totalTaxReportRepository;
   private final TaxReportMapper taxReportMapper;
+  private final TaxOfficeRegistry taxOfficeRegistry;
 
 
   @Override
@@ -106,7 +108,7 @@ public class TaxServiceImpl implements TaxService {
         .orElseThrow(() ->
             new ResourceNotFoundException(String.format("No reports loaded for year %s", form.getYear())));
 
-    UkrainianTaxOffice office = UkrainianTaxOffice.valueOf(form.getTaxOfficeId());
+    TaxOfficeEntry office = taxOfficeRegistry.findByCSTI(form.getTaxOfficeId());
 
     UUID uuid = UUID.randomUUID();
     String mainFileName = String.format("F0100214_Zvit_%s.xml", uuid);
@@ -254,8 +256,8 @@ public class TaxServiceImpl implements TaxService {
 
   @Override
   public List<TaxOfficeOptionDto> getTaxOffices() {
-    return java.util.Arrays.stream(UkrainianTaxOffice.values())
-        .map(o -> new TaxOfficeOptionDto(o.name(), o.getDisplayName()))
+    return taxOfficeRegistry.getAll().stream()
+        .map(o -> new TaxOfficeOptionDto(o.cStiOrig(), o.displayName()))
         .toList();
   }
 
@@ -268,7 +270,7 @@ public class TaxServiceImpl implements TaxService {
     return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
   }
 
-  private Declar createDeclar(UUID uuid, TotalTaxReport report, TaxDeclarationFormDto form, UkrainianTaxOffice office) {
+  private Declar createDeclar(UUID uuid, TotalTaxReport report, TaxDeclarationFormDto form, TaxOfficeEntry office) {
     String year = String.valueOf(form.getYear());
     String fillDate = LocalDate.now().format(FILL_DATE_FORMAT);
 
@@ -279,12 +281,12 @@ public class TaxServiceImpl implements TaxService {
     head.setCDocVer("11");
     head.setCDocType("0");
     head.setCDocCnt("1");
-    head.setCReg(office.getCReg());
-    head.setCRaj(office.getCRaj());
+    head.setCReg(office.cReg());
+    head.setCRaj(office.cRaj());
     head.setPeriodMonth("12");
     head.setPeriodType("5");
     head.setPeriodYear(year);
-    head.setCStiOrig(office.getCStiOrig());
+    head.setCStiOrig(office.cStiOrig());
     head.setCDocStan("1");
     head.setDFill(fillDate);
 
@@ -325,7 +327,7 @@ public class TaxServiceImpl implements TaxService {
     body.setHd1("1");
     body.setHfill(fillDate);
     body.setHname(form.getName());
-    body.setHsti(office.getDisplayName());
+    body.setHsti(office.displayName());
     body.setHstreet(form.getStreet());
     body.setHtin(form.getTin());
     body.setHz("1");
@@ -352,7 +354,7 @@ public class TaxServiceImpl implements TaxService {
     return declar;
   }
 
-  private Declar createDeclarF1(UUID uuid, TotalTaxReport report, TaxDeclarationFormDto form, UkrainianTaxOffice office) {
+  private Declar createDeclarF1(UUID uuid, TotalTaxReport report, TaxDeclarationFormDto form, TaxOfficeEntry office) {
     String year = String.valueOf(form.getYear());
     String fillDate = LocalDate.now().format(FILL_DATE_FORMAT);
 
@@ -363,12 +365,12 @@ public class TaxServiceImpl implements TaxService {
     head.setCDocVer("11");
     head.setCDocType("1");
     head.setCDocCnt("1");
-    head.setCReg(office.getCReg());
-    head.setCRaj(office.getCRaj());
+    head.setCReg(office.cReg());
+    head.setCRaj(office.cRaj());
     head.setPeriodMonth("12");
     head.setPeriodType("5");
     head.setPeriodYear(year);
-    head.setCStiOrig(office.getCStiOrig());
+    head.setCStiOrig(office.cStiOrig());
     head.setCDocStan("1");
     head.setDFill(fillDate);
 
