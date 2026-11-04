@@ -1,3 +1,20 @@
+# IDE
+.idea/
+*.iml
+
+# Build
+build/
+.gradle/
+gradle/
+gradlew
+gradlew.bat
+
+# Personal data & generated output
+assets-board.db
+example/
+exports/
+src/main/resources/*.csv
+
 # Compiled class file
 *.class
 

@@ -8,6 +8,7 @@ import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.StringWriter;
 
@@ -30,6 +31,12 @@ public class XmlGeneratorService {
         StringWriter writer = new StringWriter();
         marshaller.marshal(declar, writer);
         return writer.toString();
+    }
+
+    public byte[] generateDeclarBytes(Declar declar) throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        createMarshaller().marshal(declar, baos);
+        return baos.toByteArray();
     }
 
     public void saveXmlToFile(Declar declar, String filepath) throws Exception {

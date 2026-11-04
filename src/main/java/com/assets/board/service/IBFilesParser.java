@@ -1,11 +1,13 @@
 package com.assets.board.service;
 
+import com.assets.board.mapper.IBParserMapper;
 import com.assets.board.model.ib.DividendRecord;
 import com.assets.board.model.ib.IBPosition;
 import com.assets.board.model.ib.TradeRecord;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,16 +18,16 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class IBFilesParser {
 
-    private static final DateTimeFormatter IB_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private final IBParserMapper ibParserMapper;
 
     @Data
     public static class DividendData {
@@ -98,6 +100,7 @@ public class IBFilesParser {
             ParsedData result = new ParsedData();
             result.setDividends(parseDividends(dividendLines));
             result.setTrades(parseTrades(tradeLines));
+            result.setWithholdingTaxes(parseWithholdingTaxes(dividendLines));
             return result;
         } catch (Exception e) {
             log.error("Failed to parse IB file", e);
@@ -129,16 +132,26 @@ public class IBFilesParser {
 
             return csvToBean.parse().stream()
                     .filter(r -> "Dividends".equals(r.getType()))
-                    .map(r -> {
-                        DividendData d = new DividendData();
-                        d.setSymbol(r.getSymbol());
-                        d.setDate(LocalDate.parse(r.getDateTime().split(";")[0], IB_DATE));
-                        d.setAmount(r.getAmount());
-                        return d;
-                    })
+                    .map(ibParserMapper::toDividendData)
                     .toList();
         } catch (Exception e) {
             throw new RuntimeException("Error parsing dividends", e);
+        }
+    }
+
+    private List<WithholdingTaxData> parseWithholdingTaxes(List<String> lines) {
+        if (lines.size() <= 1) return new ArrayList<>();
+        try (StringReader reader = new StringReader(String.join("\n", lines))) {
+            CsvToBean<DividendRecord> csvToBean = new CsvToBeanBuilder<DividendRecord>(reader)
+                    .withType(DividendRecord.class)
+                    .withIgnoreLeadingWhiteSpace(true)
+                    .build();
+            return csvToBean.parse().stream()
+                    .filter(r -> "Withholding Tax".equals(r.getType()))
+                    .map(ibParserMapper::toWithholdingTaxData)
+                    .toList();
+        } catch (Exception e) {
+            throw new RuntimeException("Error parsing withholding taxes", e);
         }
     }
 
@@ -155,32 +168,7 @@ public class IBFilesParser {
                     .filter(r -> "STK".equals(r.getAssetClass()))
                     .filter(r -> "SELL".equals(r.getSide()))
                     .filter(r -> "CLOSED_LOT".equals(r.getLevelOfDetail()))
-                    .map(r -> {
-                        TradeData t = new TradeData();
-                        t.setSymbol(r.getSymbol());
-                        t.setDescription(r.getDescription());
-                        t.setCurrency(r.getCurrency());
-                        t.setSide(r.getSide());
-                        t.setTradeDate(LocalDate.parse(r.getTradeDate(), IB_DATE));
-
-                        if (r.getOpenDateTime() != null && !r.getOpenDateTime().isBlank()) {
-                            t.setOpenDate(LocalDate.parse(r.getOpenDateTime().split(";")[0], IB_DATE));
-                        }
-
-                        t.setQuantity(r.getQuantity().abs());
-                        t.setTradePrice(r.getTradePrice());
-                        t.setFifoPnlRealized(r.getFifoPnlRealized());
-
-                        // Proceeds is empty in CLOSED_LOT records — derive from price × qty
-                        if (r.getProceeds() != null && r.getProceeds().compareTo(BigDecimal.ZERO) != 0) {
-                            t.setProceeds(r.getProceeds().abs());
-                        } else {
-                            t.setProceeds(r.getFifoPnlRealized().multiply(r.getQuantity().abs()));
-                        }
-
-                        t.setIbCommission(r.getIbCommission() != null ? r.getIbCommission().abs() : BigDecimal.ZERO);
-                        return t;
-                    })
+                    .map(ibParserMapper::toTradeData)
                     .toList();
         } catch (Exception e) {
             throw new RuntimeException("Error parsing trades", e);

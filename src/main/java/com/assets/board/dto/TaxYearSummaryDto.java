@@ -25,6 +25,7 @@ public class TaxYearSummaryDto {
 
     // Combined
     BigDecimal totalTaxSum;
+    BigDecimal withheldDividendTax;
 
     List<SymbolDividendSummaryDto> dividendsBySymbol;
     List<SymbolTradeSummaryDto> tradesBySymbol;

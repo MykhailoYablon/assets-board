@@ -1,11 +1,13 @@
 package com.assets.board.service.impl;
 
-import com.assets.board.configuration.TaxpayerProperties;
 import com.assets.board.controller.exception.ResourceNotFoundException;
 import com.assets.board.dto.SymbolDividendSummaryDto;
 import com.assets.board.dto.SymbolTradeSummaryDto;
+import com.assets.board.dto.TaxDeclarationFormDto;
+import com.assets.board.dto.TaxOfficeOptionDto;
 import com.assets.board.dto.TaxYearSummaryDto;
 import com.assets.board.dto.TotalTaxReportDto;
+import com.assets.board.model.UkrainianTaxOffice;
 import com.assets.board.entity.DividendTaxReport;
 import com.assets.board.entity.TotalTaxReport;
 import com.assets.board.entity.TradeTaxReport;
@@ -30,7 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -47,15 +49,14 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Slf4j
 @Service
 @AllArgsConstructor
 public class TaxServiceImpl implements TaxService {
 
-  private static final int SCALE = 2;
-  private static final RoundingMode ROUNDING_MODE = RoundingMode.HALF_DOWN;
-  private static final String EXPORT_DIR = "exports";
   private static final DateTimeFormatter FILL_DATE_FORMAT = DateTimeFormatter.ofPattern("ddMMyyyy");
 
   private final ExchangeRateService exchangeRateService;
@@ -64,7 +65,6 @@ public class TaxServiceImpl implements TaxService {
   private final IBFilesParser parser;
   private final TotalTaxReportRepository totalTaxReportRepository;
   private final TaxReportMapper taxReportMapper;
-  private final TaxpayerProperties taxpayer;
 
 
   @Override
@@ -80,6 +80,10 @@ public class TaxServiceImpl implements TaxService {
         .map(IBFilesParser.ParsedData::getTrades)
         .orElse(Collections.emptyList());
 
+    var withholdingTaxes = Optional.ofNullable(parsedData)
+        .map(IBFilesParser.ParsedData::getWithholdingTaxes)
+        .orElse(Collections.emptyList());
+
     var dividendTaxReports = getDividendTaxReports(isMilitary, dividends);
     var tradeTaxReports = getTradeTaxReports(isMilitary, trades);
 
@@ -89,6 +93,7 @@ public class TaxServiceImpl implements TaxService {
 
     calculateTotals(totalReport, dividendTaxReports, tradeTaxReports, isMilitary);
     totalReport.setTaxReports(dividendTaxReports, tradeTaxReports);
+    totalReport.setWithheldDividendTax(getWithheldTaxUah(withholdingTaxes));
     totalReport.setStatus(ReportStatus.CALCULATED);
 
     return taxReportMapper.toDto(totalTaxReportRepository.save(totalReport));
@@ -96,19 +101,30 @@ public class TaxServiceImpl implements TaxService {
 
   @Override
   @Transactional
-  public void generateUaTaxDeclarationXml(short year) throws Exception {
-    TotalTaxReport report = totalTaxReportRepository.findByYear(year)
+  public byte[] generateUaTaxDeclarationXml(TaxDeclarationFormDto form) throws Exception {
+    TotalTaxReport report = totalTaxReportRepository.findByYear(form.getYear())
         .orElseThrow(() ->
-            new ResourceNotFoundException(String.format("No reports loaded for year %s", year)));
+            new ResourceNotFoundException(String.format("No reports loaded for year %s", form.getYear())));
 
-    new File(EXPORT_DIR).mkdirs();
+    UkrainianTaxOffice office = UkrainianTaxOffice.valueOf(form.getTaxOfficeId());
 
     UUID uuid = UUID.randomUUID();
-    String mainFilePath = EXPORT_DIR + File.separator + String.format("F0100214_Zvit_%s.xml", uuid);
-    String f1FilePath = EXPORT_DIR + File.separator + String.format("F0121214_DodatokF1_%s.xml", uuid);
+    String mainFileName = String.format("F0100214_Zvit_%s.xml", uuid);
+    String f1FileName = String.format("F0121214_DodatokF1_%s.xml", uuid);
 
-    xmlGeneratorService.saveXmlToFile(createDeclar(uuid, report), mainFilePath);
-    xmlGeneratorService.saveXmlToFile(createDeclarF1(uuid, report), f1FilePath);
+    byte[] mainXml = xmlGeneratorService.generateDeclarBytes(createDeclar(uuid, report, form, office));
+    byte[] f1Xml = xmlGeneratorService.generateDeclarBytes(createDeclarF1(uuid, report, form, office));
+
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    try (ZipOutputStream zip = new ZipOutputStream(baos)) {
+      zip.putNextEntry(new ZipEntry(mainFileName));
+      zip.write(mainXml);
+      zip.closeEntry();
+      zip.putNextEntry(new ZipEntry(f1FileName));
+      zip.write(f1Xml);
+      zip.closeEntry();
+    }
+    return baos.toByteArray();
   }
 
   @Override
@@ -119,64 +135,19 @@ public class TaxServiceImpl implements TaxService {
 
     List<SymbolDividendSummaryDto> dividendsBySymbol = report.getDividendTaxReports().stream()
         .collect(Collectors.groupingBy(DividendTaxReport::getSymbol))
-        .entrySet().stream()
-        .map(entry -> {
-          List<DividendTaxReport> rows = entry.getValue();
-          SymbolDividendSummaryDto dto = new SymbolDividendSummaryDto();
-          dto.setSymbol(entry.getKey());
-          dto.setTotalAmount(sumDividends(rows, DividendTaxReport::getAmount));
-          dto.setTotalUaBrutto(sumDividends(rows, DividendTaxReport::getUaBrutto));
-          dto.setTotalTax9(sumDividends(rows, DividendTaxReport::getTax9));
-          dto.setTotalMilitaryTax5(sumDividends(rows, DividendTaxReport::getMilitaryTax5));
-          dto.setTotalTaxSum(sumDividends(rows, DividendTaxReport::getTaxSum));
-          dto.setPayments(rows.stream()
-              .sorted(Comparator.comparing(DividendTaxReport::getDate))
-              .map(taxReportMapper::toDividendDto)
-              .toList());
-          return dto;
-        })
+        .values().stream()
+        .map(taxReportMapper::toSymbolDividendSummaryDto)
         .sorted(Comparator.comparing(SymbolDividendSummaryDto::getSymbol))
         .toList();
 
     List<SymbolTradeSummaryDto> tradesBySymbol = report.getTradeTaxReports().stream()
         .collect(Collectors.groupingBy(TradeTaxReport::getSymbol))
-        .entrySet().stream()
-        .map(entry -> {
-          List<TradeTaxReport> rows = entry.getValue();
-          SymbolTradeSummaryDto dto = new SymbolTradeSummaryDto();
-          dto.setSymbol(entry.getKey());
-          dto.setTotalUaBrutto(sumTrade(rows, TradeTaxReport::getUaBrutto));
-          dto.setTotalTax(sumTrade(rows, TradeTaxReport::getTax18));
-          dto.setTotalMilitary(sumTrade(rows, TradeTaxReport::getMilitaryTax5));
-          dto.setTotalTaxSum(sumTrade(rows, TradeTaxReport::getTaxSum));
-          dto.setTrades(rows.stream()
-              .sorted(Comparator.comparing(TradeTaxReport::getSellDate))
-              .map(taxReportMapper::toTradeDto)
-              .toList());
-          return dto;
-        })
+        .values().stream()
+        .map(taxReportMapper::toSymbolTradeSummaryDto)
         .sorted(Comparator.comparing(SymbolTradeSummaryDto::getSymbol))
         .toList();
 
-    TaxYearSummaryDto summary = new TaxYearSummaryDto();
-    summary.setYear(report.getYear());
-    summary.setDividendAmount(report.getDividendTotalGain());
-    summary.setDividendUaBrutto(report.getDividendTotalUaBrutto());
-    summary.setDividendTax(report.getDividendTotalTax());
-    summary.setDividendMilitary(report.getDividendTotalMilitaryTax5());
-    summary.setDividendTaxSum(report.getDividendTotalTax().add(report.getDividendTotalMilitaryTax5()));
-    summary.setTradeUaBrutto(report.getTradeTotalUaBrutto());
-    summary.setTradeTax(report.getTradeTotalTax());
-    summary.setTradeMilitary(report.getTradeTotalMilitaryTax5());
-    summary.setTradeTaxSum(report.getTradeTotalTax().add(report.getTradeTotalMilitaryTax5()));
-    summary.setTotalTaxSum(report.getTotalTaxSum());
-    summary.setDividendsBySymbol(dividendsBySymbol);
-    summary.setTradesBySymbol(tradesBySymbol);
-    return summary;
-  }
-
-  private BigDecimal sumTrade(List<TradeTaxReport> reports, Function<TradeTaxReport, BigDecimal> getter) {
-    return reports.stream().map(getter).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+    return taxReportMapper.toYearSummaryDto(report, dividendsBySymbol, tradesBySymbol);
   }
 
   private @NonNull List<DividendTaxReport> getDividendTaxReports(
@@ -193,33 +164,7 @@ public class TaxServiceImpl implements TaxService {
     }
 
     return dividends.stream()
-        .map(dividend -> {
-          DividendTaxReport report = new DividendTaxReport();
-          report.setSymbol(dividend.getSymbol());
-          report.setDate(dividend.getDate());
-
-          BigDecimal amount = dividend.getAmount();
-          report.setAmount(amount);
-
-          BigDecimal exchangeRate = rateCache.get(dividend.getDate());
-          report.setNbuRate(exchangeRate);
-
-          var uaBrutto = exchangeRate.multiply(amount).setScale(SCALE, ROUNDING_MODE);
-          report.setUaBrutto(uaBrutto);
-
-          var tax9 = uaBrutto.multiply(BigDecimal.valueOf(0.09)).setScale(SCALE, ROUNDING_MODE);
-          var militaryTax5 = uaBrutto.multiply(BigDecimal.valueOf(0.05)).setScale(SCALE, ROUNDING_MODE);
-          report.setTax9(tax9);
-          report.setMilitaryTax5(militaryTax5);
-
-          if (isMilitary) {
-            report.setTaxSum(tax9);
-          } else {
-            report.setTaxSum(tax9.add(militaryTax5));
-          }
-
-          return report;
-        })
+        .map(dividend -> taxReportMapper.toDividendTaxReport(dividend, rateCache.get(dividend.getDate()), isMilitary))
         .toList();
   }
 
@@ -238,43 +183,9 @@ public class TaxServiceImpl implements TaxService {
     return trades.stream()
         .filter(t -> t.getFifoPnlRealized() != null && t.getFifoPnlRealized().compareTo(BigDecimal.ZERO) > 0)
         .map(trade -> {
-          var report = new TradeTaxReport();
-          report.setSymbol(trade.getSymbol());
-          report.setQuantity(trade.getQuantity());
-          report.setSellDate(trade.getTradeDate());
-          report.setBuyDate(trade.getOpenDate() != null ? trade.getOpenDate() : trade.getTradeDate());
-
-          BigDecimal buyPrice = trade.getTradePrice();
-          report.setOriginalPrice(buyPrice);
-          report.setSellPrice(trade.getFifoPnlRealized());
-
           BigDecimal nbuRateSell = rateCache.get(trade.getTradeDate());
-          BigDecimal nbuRateBuy = trade.getOpenDate() != null
-              ? rateCache.get(trade.getOpenDate())
-              : nbuRateSell;
-
-          report.setNbuRateSell(nbuRateSell);
-          report.setNbuRateBuy(nbuRateBuy);
-
-          BigDecimal uaSell = trade.getProceeds().add(buyPrice).multiply(nbuRateSell).setScale(SCALE, ROUNDING_MODE);
-          BigDecimal uaBuy = buyPrice.multiply(nbuRateBuy).setScale(SCALE, ROUNDING_MODE);
-
-          report.setUaPriceSell(uaSell);
-          report.setUaPriceBuy(uaBuy);
-
-          // Taxable gain — cannot be negative
-          BigDecimal uaBrutto = uaSell.subtract(uaBuy).max(BigDecimal.ZERO);
-          report.setUaBrutto(uaBrutto);
-
-          // Investment income: 18% income tax + 5% military (wartime rate)
-          BigDecimal tax18 = uaBrutto.multiply(BigDecimal.valueOf(0.18)).setScale(SCALE, ROUNDING_MODE);
-          BigDecimal militaryTax5 = uaBrutto.multiply(BigDecimal.valueOf(0.05)).setScale(SCALE, ROUNDING_MODE);
-          report.setTax18(tax18);
-          report.setMilitaryTax5(militaryTax5);
-          report.setTaxSum(isMilitary ? tax18 : tax18.add(militaryTax5));
-          report.setIsMilitary(isMilitary);
-
-          return report;
+          BigDecimal nbuRateBuy = trade.getOpenDate() != null ? rateCache.get(trade.getOpenDate()) : nbuRateSell;
+          return taxReportMapper.toTradeTaxReport(trade, nbuRateSell, nbuRateBuy, isMilitary);
         })
         .toList();
   }
@@ -283,11 +194,9 @@ public class TaxServiceImpl implements TaxService {
                                List<DividendTaxReport> dividendTaxReports,
                                List<TradeTaxReport> tradeTaxReports,
                                boolean isMilitary) {
-    // Totals
     taxReport.setTradeTotalGain(sumTrades(tradeTaxReports, TradeTaxReport::getSellPrice));
     taxReport.setDividendTotalGain(sumDividends(dividendTaxReports, DividendTaxReport::getAmount));
 
-    // UAH Brutto
     var sumTrades = sumTrades(tradeTaxReports, TradeTaxReport::getUaBrutto);
     var sumDividends = sumDividends(dividendTaxReports, DividendTaxReport::getUaBrutto);
     var totalUaBrutto = sumTrades.add(sumDividends);
@@ -297,7 +206,6 @@ public class TaxServiceImpl implements TaxService {
 
     var totalTaxDividends = round(sumDividends.multiply(new BigDecimal("0.09")));
     var totalTaxTrades = round(sumTrades.multiply(new BigDecimal("0.18")));
-
 
     taxReport.setTradeTotalTax(totalTaxTrades);
     taxReport.setDividendTotalTax(totalTaxDividends);
@@ -315,39 +223,68 @@ public class TaxServiceImpl implements TaxService {
     }
   }
 
+  private BigDecimal getWithheldTaxUah(List<IBFilesParser.WithholdingTaxData> withholdingTaxes) {
+    if (withholdingTaxes.isEmpty()) return BigDecimal.ZERO;
+
+    Set<LocalDate> dates = withholdingTaxes.stream()
+        .map(IBFilesParser.WithholdingTaxData::getDate)
+        .collect(Collectors.toSet());
+
+    Map<LocalDate, BigDecimal> rateCache = new HashMap<>();
+    for (LocalDate date : dates) {
+      rateCache.put(date, exchangeRateService.getRateForDate(date));
+    }
+
+    // Withholding amounts are negative (deducted from account); negate to get positive credit
+    BigDecimal netUah = withholdingTaxes.stream()
+        .map(wt -> wt.getAmount().multiply(rateCache.get(wt.getDate())))
+        .reduce(BigDecimal.ZERO, BigDecimal::add)
+        .negate();
+
+    return netUah.max(BigDecimal.ZERO).setScale(6, RoundingMode.HALF_UP);
+  }
+
   private BigDecimal sumDividends(List<DividendTaxReport> reports, Function<DividendTaxReport, BigDecimal> getter) {
-    return reports.stream()
-        .map(getter)
-        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    return reports.stream().map(getter).reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
   private BigDecimal sumTrades(List<TradeTaxReport> reports, Function<TradeTaxReport, BigDecimal> getter) {
-    return reports.stream()
-        .map(getter)
-        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    return reports.stream().map(getter).reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  @Override
+  public List<TaxOfficeOptionDto> getTaxOffices() {
+    return java.util.Arrays.stream(UkrainianTaxOffice.values())
+        .map(o -> new TaxOfficeOptionDto(o.name(), o.getDisplayName()))
+        .toList();
   }
 
   private static BigDecimal round(BigDecimal value) {
     return value.setScale(2, RoundingMode.HALF_UP);
   }
 
-  private Declar createDeclar(UUID uuid, TotalTaxReport report) {
-    String year = String.valueOf(report.getYear());
+  private static String fmtDecl(BigDecimal value) {
+    if (value == null) return "0.00";
+    return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
+  }
+
+  private Declar createDeclar(UUID uuid, TotalTaxReport report, TaxDeclarationFormDto form, UkrainianTaxOffice office) {
+    String year = String.valueOf(form.getYear());
     String fillDate = LocalDate.now().format(FILL_DATE_FORMAT);
 
     DeclarHead head = new DeclarHead();
-    head.setTin(taxpayer.getTin());
+    head.setTin(form.getTin());
     head.setCDoc("F01");
     head.setCDocSub("002");
     head.setCDocVer("11");
     head.setCDocType("0");
     head.setCDocCnt("1");
-    head.setCReg(taxpayer.getCReg());
-    head.setCRaj(taxpayer.getCRaj());
+    head.setCReg(office.getCReg());
+    head.setCRaj(office.getCRaj());
     head.setPeriodMonth("12");
     head.setPeriodType("5");
     head.setPeriodYear(year);
-    head.setCStiOrig(taxpayer.getCStiOrig());
+    head.setCStiOrig(office.getCStiOrig());
     head.setCDocStan("1");
     head.setDFill(fillDate);
 
@@ -366,35 +303,48 @@ public class TaxServiceImpl implements TaxService {
     linkedDocs.setDocs(List.of(doc));
     head.setLinkedDocs(linkedDocs);
 
+    BigDecimal divBrutto = report.getDividendTotalUaBrutto();
+    BigDecimal divTax = report.getDividendTotalTax();
+    BigDecimal divMilitary = round(report.getDividendTotalMilitaryTax5());
+    BigDecimal tradeBrutto = report.getTradeTotalUaBrutto();
+    BigDecimal tradeTax = report.getTradeTotalTax();
+    BigDecimal tradeMilitary = round(report.getTradeTotalMilitaryTax5());
+    BigDecimal totalIncome = divBrutto.add(tradeBrutto);
+    BigDecimal totalTax = divTax.add(tradeTax);
+    BigDecimal totalMilitary = divMilitary.add(tradeMilitary);
+    BigDecimal withheld = report.getWithheldDividendTax() != null
+        ? report.getWithheldDividendTax() : BigDecimal.ZERO;
+    BigDecimal netTax = totalTax.subtract(withheld).max(BigDecimal.ZERO);
+
     DeclarBody body = new DeclarBody();
     body.setH01("1");
     body.setH03("1");
     body.setH05("1");
-    body.setHbos(taxpayer.getBuilding());
-    body.setHcity(taxpayer.getCity());
+    body.setHbos(form.getBuilding());
+    body.setHcity(form.getCity());
     body.setHd1("1");
     body.setHfill(fillDate);
-    body.setHname(taxpayer.getName());
-    body.setHsti(taxpayer.getTaxOffice());
-    body.setHstreet(taxpayer.getStreet());
-    body.setHtin(taxpayer.getTin());
+    body.setHname(form.getName());
+    body.setHsti(office.getDisplayName());
+    body.setHstreet(form.getStreet());
+    body.setHtin(form.getTin());
     body.setHz("1");
     body.setHzy(year);
-    body.setR0104g3(report.getDividendTotalUaBrutto());
-    body.setR0104g6(report.getDividendTotalTax());
-    body.setR0104g7(report.getTotalMilitaryTax5());
-    body.setR0108g3(BigDecimal.ZERO);
-    body.setR0108g6(BigDecimal.ZERO);
-    body.setR0108g7(BigDecimal.ZERO);
+    body.setR0104g3(divBrutto);
+    body.setR0104g6(divTax);
+    body.setR0104g7(divMilitary);
+    body.setR0108g3(tradeBrutto);
+    body.setR0108g6(tradeTax);
+    body.setR0108g7(tradeMilitary);
     body.setR01010g2s("Інші проценти");
-    body.setR010g3(BigDecimal.ZERO);
-    body.setR010g6(BigDecimal.ZERO);
-    body.setR010g7(BigDecimal.ZERO);
-    body.setR012g3(BigDecimal.ZERO);
-    body.setR013g3(BigDecimal.ZERO);
-    body.setR018g3(BigDecimal.ZERO);
-    body.setR0201g3(BigDecimal.ZERO);
-    body.setR0211g3(BigDecimal.ZERO);
+    body.setR010g3(totalIncome);
+    body.setR010g6(totalTax);
+    body.setR010g7(totalMilitary);
+    body.setR012g3(totalIncome);
+    body.setR013g3(totalTax);
+    body.setR018g3(withheld);
+    body.setR0201g3(netTax);
+    body.setR0211g3(totalMilitary);
 
     Declar declar = new Declar();
     declar.setDeclarHead(head);
@@ -402,23 +352,23 @@ public class TaxServiceImpl implements TaxService {
     return declar;
   }
 
-  private Declar createDeclarF1(UUID uuid, TotalTaxReport report) {
-    String year = String.valueOf(report.getYear());
+  private Declar createDeclarF1(UUID uuid, TotalTaxReport report, TaxDeclarationFormDto form, UkrainianTaxOffice office) {
+    String year = String.valueOf(form.getYear());
     String fillDate = LocalDate.now().format(FILL_DATE_FORMAT);
 
     DeclarHead head = new DeclarHead();
-    head.setTin(taxpayer.getTin());
+    head.setTin(form.getTin());
     head.setCDoc("F01");
     head.setCDocSub("212");
     head.setCDocVer("11");
     head.setCDocType("1");
     head.setCDocCnt("1");
-    head.setCReg(taxpayer.getCReg());
-    head.setCRaj(taxpayer.getCRaj());
+    head.setCReg(office.getCReg());
+    head.setCRaj(office.getCRaj());
     head.setPeriodMonth("12");
     head.setPeriodType("5");
     head.setPeriodYear(year);
-    head.setCStiOrig(taxpayer.getCStiOrig());
+    head.setCStiOrig(office.getCStiOrig());
     head.setCDocStan("1");
     head.setDFill(fillDate);
 
@@ -437,22 +387,46 @@ public class TaxServiceImpl implements TaxService {
     linkedDocs.setDocs(List.of(doc));
     head.setLinkedDocs(linkedDocs);
 
-    // F1 appendix is for capital gains (investment income from stock sales).
-    // Capital gains calculation is not yet implemented — all fields are zero.
+    List<TradeTaxReport> trades = report.getTradeTaxReports();
+    BigDecimal totalSell = BigDecimal.ZERO;
+    BigDecimal totalBuy = BigDecimal.ZERO;
+
     DeclarBodyF1 body = new DeclarBodyF1();
-    body.setHbos(taxpayer.getName());
-    body.setHtin(taxpayer.getTin());
+    body.setHbos(form.getName());
+    body.setHtin(form.getTin());
     body.setHz("1");
     body.setHzy(year);
-    body.setR001g4("0");
-    body.setR001g5("0");
-    body.setR001g6("0");
-    body.setR003g6("0");
-    body.setR004g6("0");
-    body.setR005g6("0");
-    body.setR031g6("0");
-    body.setR042g6("0");
-    body.setR052g6("0");
+
+    for (int i = 0; i < trades.size(); i++) {
+      TradeTaxReport trade = trades.get(i);
+      String rowNum = String.valueOf(i + 1);
+      BigDecimal sell = trade.getUaPriceSell() != null ? trade.getUaPriceSell() : BigDecimal.ZERO;
+      BigDecimal buy = trade.getUaPriceBuy() != null ? trade.getUaPriceBuy() : BigDecimal.ZERO;
+      BigDecimal gain = trade.getUaBrutto() != null ? trade.getUaBrutto() : BigDecimal.ZERO;
+      totalSell = totalSell.add(sell);
+      totalBuy = totalBuy.add(buy);
+      // G4 = sale proceeds (UAH), G5 = purchase cost (UAH), G6 = taxable gain
+      body.addTableRow(rowNum,
+          fmtDecl(trade.getQuantity()),
+          trade.getSymbol(),
+          fmtDecl(sell),
+          fmtDecl(buy),
+          fmtDecl(gain));
+    }
+
+    BigDecimal totalGain = report.getTradeTotalUaBrutto();
+    BigDecimal tradeTax = report.getTradeTotalTax();
+    BigDecimal tradeMilitary = round(report.getTradeTotalMilitaryTax5());
+
+    body.setR001g4(fmtDecl(totalSell));
+    body.setR001g5(fmtDecl(totalBuy));
+    body.setR001g6(fmtDecl(totalGain));
+    body.setR003g6(fmtDecl(totalGain));
+    body.setR004g6(fmtDecl(tradeTax));
+    body.setR005g6(fmtDecl(tradeMilitary));
+    body.setR031g6(fmtDecl(totalGain));
+    body.setR042g6(fmtDecl(tradeTax));
+    body.setR052g6(fmtDecl(tradeMilitary));
 
     Declar declar = new Declar();
     declar.setDeclarHead(head);

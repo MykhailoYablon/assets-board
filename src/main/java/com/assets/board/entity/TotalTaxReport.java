@@ -65,6 +65,9 @@ public class TotalTaxReport {
     @Column(name = "total_tax_sum", nullable = false, precision = 19, scale = 2)
     BigDecimal totalTaxSum;
 
+    @Column(name = "withheld_dividend_tax", precision = 19, scale = 6)
+    BigDecimal withheldDividendTax = BigDecimal.ZERO;
+
     @OneToMany(mappedBy = "totalTaxReport", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @JsonManagedReference
     List<DividendTaxReport> dividendTaxReports = new ArrayList<>();
